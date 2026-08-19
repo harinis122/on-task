@@ -10,16 +10,22 @@ import SwiftUI
 
 @main
 struct OnTaskApp: App {
+    @State private var focusSession = FocusSession()
+
     init() {
         NSApplication.shared.setActivationPolicy(.accessory)
     }
 
     var body: some Scene {
         MenuBarExtra {
-            MenuView()
+            MenuView(focusSession: focusSession)
         } label: {
-            Image(systemName: "smallcircle.filled.circle")
-                .accessibilityLabel("OnTask")
+            if let taskTitle = focusSession.menuBarTaskTitle {
+                Text(taskTitle)
+            } else {
+                Image(systemName: "smallcircle.filled.circle")
+                    .accessibilityLabel("OnTask")
+            }
         }
         .menuBarExtraStyle(.window)
     }

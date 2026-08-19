@@ -9,15 +9,17 @@ import AppKit
 import SwiftUI
 
 struct MenuView: View {
+    let focusSession: FocusSession
+
+    @State private var taskText = ""
+
     var body: some View {
         VStack(spacing: 12) {
-            Text("No current task")
-                .font(.headline)
-
-            Text("OnTask is running from the menu bar.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            if let currentTask = focusSession.currentTask {
+                currentTaskView(currentTask)
+            } else {
+                noTaskView
+            }
 
             Divider()
 
@@ -27,6 +29,41 @@ struct MenuView: View {
             .keyboardShortcut("q")
         }
         .padding()
-        .frame(width: 240)
+        .frame(width: 260)
+    }
+
+    private var noTaskView: some View {
+        VStack(spacing: 10) {
+            Text("What are you doing?")
+                .font(.headline)
+
+            TextField("Current task", text: $taskText)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit(startTask)
+
+            Button("Start Task", action: startTask)
+                .disabled(taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+
+    private func currentTaskView(_ currentTask: String) -> some View {
+        VStack(spacing: 8) {
+            Text("Current task")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(currentTask)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func startTask() {
+        guard focusSession.startTask(taskText) else {
+            return
+        }
+
+        taskText = ""
     }
 }
