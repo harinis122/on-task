@@ -22,7 +22,7 @@ Prefer small, understandable, independently testable changes.
 
 The core problem OnTask solves is simple:
 
-> What am I supposed to be doing right now?
+> **What am I supposed to be doing right now?**
 
 Users often:
 
@@ -106,7 +106,7 @@ Conceptually:
 
 The exact icon may change, so icon-specific assumptions should not be spread throughout the code.
 
-Use the asset system or a centralized configuration where appropriate.
+Use the asset system or centralized configuration where appropriate.
 
 ### Current Task Exists
 
@@ -118,19 +118,19 @@ When a task is active:
 
 Task text should be truncated when necessary.
 
-The exact limit should be centralized rather than hard-coded throughout the UI.
+The display limit should be centralized rather than hard-coded throughout the UI.
 
-Target approximately **5-20 visible characters** for the menu bar representation.
+Target approximately **5–20 visible characters** for the menu bar representation.
 
 The full task name must remain available inside the menu.
 
 Example:
 
 ```text
-Finish database assign...
+Finish database...
 ```
 
-Do not let very long task names consume excessive menu bar width.
+Do not let long task names consume excessive menu bar width.
 
 ---
 
@@ -244,7 +244,7 @@ Do not introduce:
 
 unless explicitly requested in a future product change.
 
-The current task should conceptually contain enough information to represent:
+The current focus session should conceptually contain enough information to represent:
 
 ```text
 task text
@@ -257,15 +257,54 @@ The exact internal representation may vary if a cleaner implementation exists.
 
 ---
 
-# 9. Starting a Task
+# 9. Session Lifetime
+
+A focus session exists only while OnTask is running.
+
+Current task and timer state are **in-memory session state**.
+
+The MVP does not persist an active focus session between application launches.
+
+Conceptually:
+
+```text
+Launch OnTask
+      ↓
+New empty FocusSession
+      ↓
+Set task
+      ↓
+Work on task
+      ↓
+Quit OnTask
+      ↓
+FocusSession ends
+      ↓
+Launch OnTask again
+      ↓
+New empty FocusSession
+```
+
+A fresh application launch should begin with:
+
+```text
+currentTask = none
+timer = inactive
+elapsedTime = 0
+```
+
+Do not restore the previous task or stopwatch when the app relaunches.
+
+---
+
+# 10. Starting a Task
 
 Starting a task should:
 
 1. validate that meaningful task text exists,
 2. set that text as the current task,
 3. begin the task stopwatch,
-4. update the menu bar label,
-5. persist the appropriate state.
+4. update the menu bar label.
 
 Whitespace-only task names should not become valid tasks.
 
@@ -273,7 +312,7 @@ Avoid unnecessary validation beyond what is useful for this small app.
 
 ---
 
-# 10. Renaming a Task
+# 11. Renaming a Task
 
 Renaming changes the description of the current task.
 
@@ -298,11 +337,18 @@ After:
 Elapsed: 18:42
 ```
 
-Do not implement rename by clearing the task and creating a new one if doing so resets session state.
+Renaming should preserve:
+
+* elapsed time,
+* running/paused state,
+* accumulated duration,
+* current timer start/resume timestamp.
+
+Do not implement rename by clearing the task and creating a new one.
 
 ---
 
-# 11. Completing / Clearing a Task
+# 12. Completing / Clearing a Task
 
 For the MVP, marking the task as done and clearing the current task lead to the same resulting focus state:
 
@@ -316,8 +362,7 @@ Clearing/completing should:
 2. reset timer state,
 3. reset accumulated elapsed time,
 4. remove task text from the menu bar,
-5. return the menu bar to the icon-only state,
-6. persist the cleared state.
+5. return the menu bar to the icon-only state.
 
 Do not retain a task history in the MVP.
 
@@ -331,7 +376,7 @@ timer = inactive
 
 ---
 
-# 12. Stopwatch Requirements
+# 13. Stopwatch Requirements
 
 Each active task has a stopwatch.
 
@@ -346,11 +391,11 @@ The stopwatch measures how long the current focus session has been active.
 
 ---
 
-# 13. Stopwatch Architecture
+# 14. Stopwatch Architecture
 
-Do **not** design the stopwatch around persistently incrementing and saving a counter every second.
+Do **not** design the stopwatch around incrementing a permanent counter every second.
 
-Avoid this conceptual model:
+Avoid making the timer itself conceptually:
 
 ```text
 421
@@ -360,11 +405,11 @@ Avoid this conceptual model:
 425
 ```
 
-with every tick treated as persisted application state.
+with every UI tick treated as a business-state mutation.
 
 Instead, use timestamps and accumulated elapsed duration.
 
-A conceptual model is:
+Conceptually:
 
 ```text
 elapsed duration before current run
@@ -381,27 +426,26 @@ Current time:    10:07:32
 Current run duration = 7m 32s
 ```
 
-If 12 minutes had already accumulated before the resume:
+If 12 minutes had already accumulated before resume:
 
 ```text
 12:00 + 7:32 = 19:32
 ```
 
-The UI may refresh frequently to display the stopwatch.
+The UI may refresh frequently enough to display a natural stopwatch.
 
-Frequent UI refreshes should not require frequent persistence writes.
+The underlying timer logic belongs in `FocusSession`.
 
 ---
 
-# 14. Pause Semantics
+# 15. Pause Semantics
 
 When the stopwatch is running and the user pauses it:
 
 1. calculate elapsed time accumulated during the current run,
 2. add that duration to previously accumulated elapsed time,
 3. mark the stopwatch as paused,
-4. stop increasing displayed elapsed time,
-5. persist the meaningful state change.
+4. stop increasing displayed elapsed time.
 
 While paused, wall-clock time should not increase task elapsed time.
 
@@ -420,7 +464,7 @@ Elapsed at 8:30 = still 10 minutes
 
 ---
 
-# 15. Resume Semantics
+# 16. Resume Semantics
 
 Resuming a paused task should:
 
@@ -433,11 +477,11 @@ Resume must not reset elapsed time.
 
 ---
 
-# 16. Restart Semantics
+# 17. Restart Semantics
 
 Restarting the stopwatch means:
 
-> Keep the same current task, but reset its elapsed time to zero.
+> **Keep the same current task, but reset its elapsed time to zero and begin timing again.**
 
 Example:
 
@@ -461,152 +505,107 @@ Elapsed:
 
 The task itself remains active.
 
-If the timer was running before restart, restarting should result in a fresh running timer unless existing UI semantics explicitly specify otherwise.
+Whether the timer was previously running or paused, restart should produce a fresh running timer beginning at zero.
 
-Keep restart logic centralized in the model.
-
----
-
-# 17. Quit Semantics
-
-Selecting Quit should terminate OnTask normally.
-
-When OnTask quits:
-
-* its menu bar icon/text disappears because the application is no longer running.
-
-Do not leave a separate floating UI element behind.
-
-Persist enough meaningful state before termination to allow the application to restore its previous state when reopened.
+Keep restart logic centralized in `FocusSession`.
 
 ---
 
-# 18. Persistence Behavior
+# 18. Quit Semantics
 
-OnTask stores application state locally on the user's Mac.
+Quitting OnTask intentionally ends the current application session.
 
-The MVP does not require:
+Because current task and stopwatch state are not persisted, quitting while a task exists would destroy that focus session.
 
-* a backend,
-* networking,
-* authentication,
-* user accounts,
+Therefore Quit has two behaviors.
+
+## 18.1 Quit With No Current Task
+
+If no current task exists:
+
+```text
+User selects Quit
+      ↓
+OnTask quits immediately
+```
+
+No confirmation is necessary.
+
+## 18.2 Quit With an Active Task
+
+If a current task exists, whether its stopwatch is running or paused:
+
+```text
+User selects Quit
+      ↓
+Confirmation required
+```
+
+The user must be clearly warned that quitting will lose the current task and timer state.
+
+Conceptually:
+
+```text
+┌────────────────────────────────────────┐
+│ Quit OnTask?                           │
+│                                        │
+│ Your current task and timer will be    │
+│ cleared when OnTask quits.             │
+│                                        │
+│          Cancel        Quit            │
+└────────────────────────────────────────┘
+```
+
+The exact wording may change, but it must clearly communicate data/session loss.
+
+### Cancel
+
+If the user chooses Cancel:
+
+* do not quit,
+* preserve the task,
+* preserve timer state,
+* continue the existing focus session.
+
+### Confirm Quit
+
+If the user confirms:
+
+* terminate OnTask,
+* remove its menu bar presence,
+* allow all in-memory focus-session state to disappear.
+
+A later application launch begins with a new empty session.
+
+---
+
+# 19. No Persistence in the MVP
+
+The MVP intentionally does **not** persist the active focus session.
+
+Do not add:
+
+* `UserDefaults` session storage,
+* SwiftData,
+* Core Data,
+* SQLite,
+* files for task-session storage,
 * cloud storage,
 * remote databases,
-* analytics infrastructure.
 
-Use lightweight local persistence.
+for the current task or timer.
 
-The preferred MVP mechanism is:
+Task and timer information should exist only in application memory while OnTask is running.
 
-```text
-UserDefaults
-```
-
-unless an implementation constraint clearly makes another built-in local mechanism more appropriate.
+This is a deliberate product decision, not a missing feature.
 
 ---
 
-# 19. Persistence Responsibilities
+# 20. Architecture Overview
 
-Persistence logic belongs behind:
-
-```text
-Services/PersistenceService.swift
-```
-
-Views should **not** interact with `UserDefaults` directly.
-
-Avoid:
+The MVP architecture is:
 
 ```text
-MenuView
-    ↓
-UserDefaults.standard...
-```
-
-Prefer:
-
-```text
-MenuView
-    ↓
-FocusSession
-    ↓
-PersistenceService
-    ↓
-UserDefaults
-```
-
-This keeps storage details separate from UI behavior.
-
----
-
-# 20. What Should Be Persisted
-
-Persist enough state to accurately restore the current task session.
-
-That will likely include information equivalent to:
-
-```text
-task text
-timer state
-current run start/resume timestamp
-previous accumulated elapsed time
-```
-
-The exact stored keys or encoded representation are implementation details.
-
-Keep persistence representation cohesive and easy to evolve.
-
-Avoid storing values that can be safely derived from other persisted state.
-
----
-
-# 21. App Restart Behavior
-
-When OnTask launches:
-
-```text
-OnTaskApp
-    ↓
-load persisted state
-    ↓
-restore FocusSession
-    ↓
-render correct menu-bar state
-```
-
-If no task existed:
-
-```text
-icon-only menu state
-```
-
-If a task existed:
-
-```text
-task menu state
-```
-
-If the task was paused:
-
-```text
-restore paused task
-restore accumulated duration
-do not count time while app was closed
-```
-
-If the task was running when the app was closed:
-
-* preserve timestamp-based semantics,
-* elapsed time may continue based on the running task's timestamps when restored.
-
-Avoid implementations that require the process to stay alive for time measurement to remain accurate.
-
----
-
-# 22. Architecture Overview
-
                          OnTaskApp
                             │
                             ▼
@@ -615,24 +614,46 @@ Avoid implementations that require the process to stay alive for time measuremen
                     │    (Model)     │
                     └───────┬────────┘
                          ▲   │
-         reads state /   │   │ save / load
-        invokes actions  │   ▼
-                         │  ┌─────────────────────┐
-                         │  │ PersistenceService  │
-                         │  └──────────┬──────────┘
-                         │             ▼
-                    ┌────┴─────┐  UserDefaults
+                         │   │
+             reads state │   │ state changes
+          invokes actions│   │
+                         │   ▼
+                    ┌────┴─────┐
                     │ MenuView │
                     │  (View)  │
                     └────┬─────┘
                          ↕
                         User
+```
 
-MenuView and FocusSession form the application's continuous interaction loop. PersistenceService is a supporting service used by the model to save and restore meaningful state; it is not the terminal step of every user interaction.
+The primary runtime interaction loop is:
+
+```text
+User
+  ↓
+MenuView
+  ↓
+FocusSession
+  ↓
+state changes
+  ↓
+MenuView reflects new state
+  ↓
+User
+```
+
+`OnTaskApp` sits above this loop and:
+
+* launches the menu-bar application,
+* creates the shared `FocusSession`,
+* provides that session to `MenuView`,
+* handles top-level application wiring.
+
+There is no persistence layer in the MVP.
 
 ---
 
-# 23. Repository / Source Structure
+# 21. Repository / Source Structure
 
 The intended MVP source structure is:
 
@@ -644,9 +665,6 @@ OnTask/
 ├── Models/
 │   └── FocusSession.swift
 │
-├── Services/
-│   └── PersistenceService.swift
-│
 ├── OnTaskApp.swift
 └── Assets.xcassets/
 ```
@@ -657,7 +675,7 @@ Add new files or directories only when they have an actual responsibility.
 
 ---
 
-# 24. File Responsibilities
+# 22. File Responsibilities
 
 ## `OnTaskApp.swift`
 
@@ -666,8 +684,7 @@ The application entry point.
 Responsibilities:
 
 * configure the macOS menu-bar application,
-* initialize shared application state,
-* restore persisted focus state,
+* create shared `FocusSession` state,
 * connect the root menu UI to that state,
 * manage top-level application lifecycle concerns.
 
@@ -691,13 +708,12 @@ Responsibilities include displaying:
 * timer controls,
 * rename controls,
 * done/clear controls,
-* quit control.
+* quit control,
+* quit confirmation UI when appropriate.
 
-`MenuView` may coordinate presentation of feature UI.
+`MenuView` may detect user actions and invoke model behavior.
 
-It should not own the underlying business rules.
-
-Do not place persistence implementation here.
+It should not own underlying focus-session rules.
 
 Do not duplicate timer calculations here if they belong in `FocusSession`.
 
@@ -705,7 +721,7 @@ Do not duplicate timer calculations here if they belong in `FocusSession`.
 
 ## `Models/FocusSession.swift`
 
-The primary model and source of truth for the current focus session.
+The primary model and single source of truth for the current focus session.
 
 Responsibilities include state and behavior related to:
 
@@ -721,7 +737,7 @@ Responsibilities include state and behavior related to:
 * rename,
 * clear/complete.
 
-This model owns the meaning of user actions.
+This model owns the meaning of focus-session actions.
 
 Example:
 
@@ -733,24 +749,11 @@ MenuView receives click
 FocusSession.pause()
         ↓
 FocusSession calculates and updates state
+        ↓
+MenuView reflects the updated state
 ```
 
 Do not make `MenuView` independently implement pause logic.
-
----
-
-## `Services/PersistenceService.swift`
-
-Responsible for storing and restoring local application state.
-
-Responsibilities:
-
-* abstract `UserDefaults`,
-* save meaningful focus session state,
-* load saved focus session state,
-* clear persisted focus state when appropriate.
-
-UI code should not care how persistence is implemented.
 
 ---
 
@@ -767,7 +770,7 @@ Do not place Swift source code in the asset catalog.
 
 ---
 
-# 25. Views vs Models vs Services
+# 23. Views vs Models
 
 Use these definitions consistently.
 
@@ -775,7 +778,7 @@ Use these definitions consistently.
 
 Views answer:
 
-> What does the user see?
+> **What does the user see and interact with?**
 
 Examples:
 
@@ -784,11 +787,12 @@ Examples:
 * buttons,
 * menu sections,
 * formatting,
-* layout.
+* layout,
+* alerts and confirmations.
 
-Views may detect a user event such as a click.
+Views may detect an event such as a click.
 
-Views should delegate the meaning of that event to the appropriate model.
+Views should delegate the meaning of task/timer actions to the model.
 
 ---
 
@@ -796,41 +800,44 @@ Views should delegate the meaning of that event to the appropriate model.
 
 Models answer:
 
-> What does the application know, and what are the rules around that state?
+> **What does the application know, and what are the rules around that state?**
 
 Examples:
 
 ```text
 current task
-is timer paused?
+is the timer paused?
 when was the timer resumed?
 how much elapsed time has accumulated?
-what does "restart" mean?
+what does restart mean?
+what happens when a task is cleared?
 ```
 
-Models own application behavior and state transitions.
+Models own application state and state transitions.
 
 ---
 
-## Services
+# 24. Future Services
 
-Services answer:
+There is no `Services/` folder required for the current MVP.
 
-> How does the application interact with storage, macOS facilities, or external systems?
+If OnTask later needs to interact with operating-system facilities or external systems, a service layer may be introduced then.
 
-For the MVP:
+Possible future examples include:
 
 ```text
-PersistenceService
+NotificationService
+CalendarService
+LaunchAtLoginService
 ```
 
-handles local storage.
+Do not create these now.
 
-Views should generally not interact directly with external systems.
+Do not create an empty `Services/` folder merely for future architecture.
 
 ---
 
-# 26. Root UI Philosophy
+# 25. Root UI Philosophy
 
 `MenuView` is the root/master UI container.
 
@@ -846,11 +853,11 @@ Do not create additional UI abstraction merely for symmetry.
 
 If the UI eventually becomes complex enough to justify separate feature views, `MenuView` may compose them.
 
-Conceptually:
+Current:
 
 ```text
 MenuView
-├── current MVP focus UI
+└── MVP focus UI
 ```
 
 Potentially later:
@@ -866,7 +873,7 @@ Do not build those future modules until explicitly requested.
 
 ---
 
-# 27. No Master Model for the MVP
+# 26. No Master Model for the MVP
 
 Do not introduce a generic:
 
@@ -882,7 +889,7 @@ Currently:
 
 ```text
 MenuView
-    ↓
+    ↕
 FocusSession
 ```
 
@@ -906,11 +913,11 @@ Do not preemptively build it.
 
 ---
 
-# 28. Extensibility Philosophy
+# 27. Extensibility Philosophy
 
 The architecture should remain easy to extend without implementing extensions prematurely.
 
-Potential future concepts may include things such as:
+Potential future concepts may include:
 
 * Pomodoro functionality,
 * macOS notifications,
@@ -921,36 +928,35 @@ Potential future concepts may include things such as:
 
 These are **not part of the MVP** unless explicitly requested.
 
-However, current code should avoid unnecessarily preventing such additions.
+Current code should avoid unnecessarily preventing such additions.
 
 The correct approach is:
 
-> Build clean boundaries now, not unused future infrastructure.
-
-For example:
+> **Build clean boundaries now, not unused future infrastructure.**
 
 Good:
 
 ```text
-MenuView → FocusSession → PersistenceService
+MenuView ↔ FocusSession
 ```
 
-because components have clear responsibilities.
+because the UI and focus logic have clear responsibilities.
 
 Bad:
 
 ```text
 MenuView.swift
+
 contains UI
-contains timer algorithm
-contains storage
-contains integration code
+contains timer algorithms
+contains integrations
+contains system services
 contains everything
 ```
 
 ---
 
-# 29. Integration Philosophy
+# 28. Integration Philosophy
 
 If OnTask later communicates with external applications or services, that integration should generally not be embedded directly in `MenuView` or `FocusSession`.
 
@@ -970,19 +976,19 @@ Do not implement integrations unless explicitly requested.
 
 ---
 
-# 30. Pomodoro Extensibility
+# 29. Pomodoro Extensibility
 
 Do not add Pomodoro functionality in the MVP.
 
-If Pomodoro is added later, it should not require rewriting the core focus session architecture.
+If Pomodoro is added later, it should not require rewriting the core focus-session architecture.
 
-Keep current task logic sufficiently isolated that another timer-related feature can be introduced as its own model/service where appropriate.
+Keep current task logic sufficiently isolated that another timer-related feature can be introduced as its own model or service where appropriate.
 
 Do not combine hypothetical Pomodoro behavior into `FocusSession` now.
 
 ---
 
-# 31. UI Design Principles
+# 30. UI Design Principles
 
 OnTask should feel:
 
@@ -1009,7 +1015,7 @@ Its own UI should therefore demand as little attention as reasonably possible.
 
 ---
 
-# 32. Menu-Bar Design Principles
+# 31. Menu-Bar Design Principles
 
 Menu-bar space is scarce.
 
@@ -1023,13 +1029,13 @@ Therefore:
 
 The menu bar's main job is:
 
-> Keep the current task visible.
+> **Keep the current task visible.**
 
 Detailed timer information belongs inside the menu.
 
 ---
 
-# 33. Native macOS First
+# 32. Native macOS First
 
 Prefer native Apple APIs and SwiftUI where reasonable.
 
@@ -1056,9 +1062,9 @@ for functionality that can be implemented cleanly with the native macOS stack.
 
 ---
 
-# 34. Dependencies
+# 33. Dependencies
 
-Prefer the standard Apple frameworks.
+Prefer standard Apple frameworks.
 
 Do not add third-party dependencies unless:
 
@@ -1079,7 +1085,7 @@ For the MVP, the expected third-party dependency count is:
 
 ---
 
-# 35. State Ownership Rule
+# 34. State Ownership Rule
 
 One of the most important architectural rules:
 
@@ -1092,7 +1098,7 @@ Avoid duplicated state such as:
 ```text
 MenuView.currentTask
 FocusSession.currentTask
-PersistenceService.currentTask
+OnTaskApp.currentTask
 ```
 
 where each can independently diverge.
@@ -1103,24 +1109,24 @@ Prefer:
 FocusSession.currentTask
 ```
 
-with other components reading, presenting, saving, or restoring that value.
+with other components reading or presenting that state.
 
 ---
 
-# 36. Keep Views Thin
+# 35. Keep Views Thin
 
 A view may:
 
 * display state,
 * format state for presentation,
 * collect user input,
-* call model actions.
+* call model actions,
+* show confirmation UI.
 
 A view should generally not:
 
 * calculate session semantics,
 * implement timer state machines,
-* access persistence directly,
 * decide how restart works,
 * decide how pause accumulation works.
 
@@ -1128,7 +1134,7 @@ If logic becomes difficult to describe as purely UI behavior, it likely belongs 
 
 ---
 
-# 37. Keep Models Focused
+# 36. Keep Models Focused
 
 `FocusSession` should represent focus-session behavior.
 
@@ -1143,7 +1149,33 @@ It should not eventually become responsible for:
 * menu layout,
 * app icons.
 
-When a responsibility is genuinely different, introduce an appropriate service/model when needed.
+When a responsibility is genuinely different, introduce an appropriate component when there is an actual requirement.
+
+---
+
+# 37. Quit Confirmation Responsibility
+
+The decision about whether quitting would destroy an active session depends on focus-session state.
+
+The application should determine:
+
+```text
+Does a current task exist?
+```
+
+If no:
+
+```text
+Quit immediately
+```
+
+If yes:
+
+```text
+Ask for confirmation
+```
+
+Quit confirmation is a UI responsibility. If a current task exists, show a confirmation dialog before terminating the app. Do not save or restore the session as part of this flow; the confirmation exists only to prevent accidental loss of the current in-memory task and timer.
 
 ---
 
@@ -1158,10 +1190,8 @@ Avoid unnecessary complexity.
 Important failures should:
 
 * fail safely,
-* avoid corrupting state,
+* avoid inconsistent state,
 * avoid crashing where reasonably possible.
-
-Persistence failures should not cause an unrecoverable application state.
 
 Do not introduce large error-management frameworks for the MVP.
 
@@ -1176,7 +1206,6 @@ Good examples:
 ```text
 FocusSession
 MenuView
-PersistenceService
 elapsedTime
 isPaused
 resume()
@@ -1249,22 +1278,21 @@ This repository should be developed incrementally.
 
 When given a small implementation request:
 
-> Implement only the requested increment.
+> **Implement only the requested increment.**
 
 Do not automatically continue into later milestones.
 
 For example, if asked:
 
-> Create the basic menu bar icon and menu.
+> Add quit confirmation for active tasks.
 
 Do not also implement:
 
-* focus-session persistence,
-* stopwatch,
+* notifications,
 * Pomodoro,
 * integrations,
-
-unless explicitly requested.
+* storage,
+* unrelated UI redesigns.
 
 Small commits and understandable milestones are preferred.
 
@@ -1313,15 +1341,19 @@ Keep the architecture coherent.
 
 Do not reorganize the project casually.
 
-The intended baseline is:
+The intended MVP baseline is:
 
 ```text
 Views/
 Models/
-Services/
 ```
 
-plus the app entry point and assets.
+plus:
+
+```text
+OnTaskApp.swift
+Assets.xcassets/
+```
 
 If a new folder is justified by actual code, it may be introduced.
 
@@ -1382,8 +1414,11 @@ Examples:
 * restart resets duration,
 * rename preserves duration,
 * clear returns to icon-only state,
-* quitting removes menu-bar presence,
-* persisted state restores correctly.
+* Quit with no task exits immediately,
+* Quit with an active task requires confirmation,
+* Cancel on the quit confirmation preserves the session,
+* confirmed Quit removes the menu-bar presence,
+* relaunch starts with an empty focus session.
 
 Only validate behavior relevant to the current implementation stage.
 
@@ -1443,9 +1478,9 @@ Do not commit:
 
 # 50. Privacy
 
-OnTask's MVP is local-first.
+OnTask's MVP is local and session-based.
 
-Task text and timer data should remain on the user's Mac.
+Task text and timer state exist only inside the running application process.
 
 Do not:
 
@@ -1486,9 +1521,8 @@ Avoid:
 
 * aggressive polling,
 * unnecessary background processing,
-* frequent disk writes,
-* high-frequency persistence,
-* unnecessary networking.
+* unnecessary networking,
+* unnecessary CPU work.
 
 A visible stopwatch may refresh frequently enough for a natural display, but the underlying architecture should remain efficient.
 
@@ -1503,6 +1537,8 @@ Do not sacrifice accessibility for custom visuals.
 Buttons and icons should have understandable labels where appropriate.
 
 The application should remain usable without relying solely on ambiguous iconography.
+
+Confirmation dialogs should clearly identify the destructive action.
 
 ---
 
@@ -1528,7 +1564,8 @@ Do not independently add:
 * cloud synchronization,
 * account systems,
 * onboarding flows,
-* settings dashboards.
+* settings dashboards,
+* focus-session persistence.
 
 Even if such a feature seems useful, it is outside the current MVP unless explicitly requested.
 
@@ -1545,6 +1582,7 @@ GraphQL
 SQLite
 SwiftData
 Core Data
+UserDefaults session persistence
 PostgreSQL
 cloud storage
 authentication
@@ -1566,44 +1604,44 @@ Even though the overall MVP is documented here, do not interpret this document a
 If the current prompt asks only for:
 
 ```text
-menu bar shell
+quit confirmation
 ```
 
 implement only that.
 
-If the next prompt asks for:
+If a later prompt asks for:
 
 ```text
-FocusSession
+UI polish
 ```
 
-implement that next.
+implement that separately.
 
 The purpose of this document is to ensure each incremental change fits the same architecture.
 
 ---
 
-# 57. Preferred Development Sequence
+# 57. Current MVP Development Status
 
-Unless the repository has already progressed beyond these stages, a sensible development order is:
+The following core behaviors have already been implemented or are considered part of the established MVP design:
 
 ```text
 1. Native menu-bar application shell
-2. MenuView and quit behavior
+2. MenuView and Quit behavior
 3. FocusSession task state
-4. Set / display / clear current task
-5. Stopwatch core behavior
-6. Pause / resume
-7. Restart
-8. Rename
-9. Persistence
-10. Restore state across launches
-11. Polish and validation
+4. Set / display current task
+5. Clear / complete current task
+6. Running stopwatch
+7. Pause / resume
+8. Restart
+9. Rename
 ```
 
-This sequence is guidance, not a request to implement every step.
+Do not reimplement working functionality unnecessarily.
 
-Always follow the current explicit task.
+Remaining work should be performed incrementally based on explicit prompts.
+
+No persistence milestone exists in the current MVP.
 
 ---
 
@@ -1627,14 +1665,6 @@ Put it in:
 Models/
 ```
 
-### Is this about storage, macOS facilities, or external communication?
-
-Put it in:
-
-```text
-Services/
-```
-
 ### Is this about application startup and top-level wiring?
 
 It likely belongs in:
@@ -1643,11 +1673,19 @@ It likely belongs in:
 OnTaskApp.swift
 ```
 
+### Is this interaction with a future external system or macOS service?
+
+Only then consider introducing:
+
+```text
+Services/
+```
+
+Do not create the layer before it is needed.
+
 ---
 
-# 59. Example Event Flow
-
-For a Pause click:
+# 59. Example Event Flow: Pause
 
 ```text
 User
@@ -1660,12 +1698,12 @@ FocusSession.pause()
   ↓
 FocusSession updates elapsed state
   ↓
-PersistenceService saves meaningful state
+SwiftUI reflects new state in MenuView
   ↓
-SwiftUI reflects new state
+User continues interacting
 ```
 
-The same general pattern should apply to:
+The same general pattern applies to:
 
 ```text
 start
@@ -1677,33 +1715,72 @@ clear
 
 ---
 
-# 60. Central Engineering Principle
+# 60. Example Event Flow: Quit
+
+## No Active Task
+
+```text
+User
+  ↓
+Quit
+  ↓
+No active task
+  ↓
+Terminate OnTask
+```
+
+## Active Task
+
+```text
+User
+  ↓
+Quit
+  ↓
+Active task exists
+  ↓
+Show confirmation
+  ↓
+         ┌─────────────┴─────────────┐
+         ▼                           ▼
+      Cancel                    Confirm Quit
+         │                           │
+         ▼                           ▼
+Keep FocusSession              Terminate app
+unchanged                      and discard session
+```
+
+---
+
+# 61. Central Engineering Principle
 
 The central architecture principle for OnTask is:
 
-> **The UI presents state. The model owns behavior. Services handle external/system concerns.**
+> **The UI presents state. The model owns behavior. The app entry point starts and connects everything.**
 
-Or more concretely:
+More concretely:
 
 ```text
 MenuView
-= what the user sees
+= what the user sees and interacts with
 
 FocusSession
 = what the app knows and how focus behavior works
 
-PersistenceService
-= how the app remembers
-
 OnTaskApp
 = how everything starts and connects
+```
+
+The main runtime relationship is:
+
+```text
+User ↔ MenuView ↔ FocusSession
 ```
 
 Maintain this separation unless a concrete requirement demonstrates that another design would be simpler or clearer.
 
 ---
 
-# 61. Definition of a Good Change
+# 62. Definition of a Good Change
 
 A good OnTask change should:
 
@@ -1718,4 +1795,3 @@ A good OnTask change should:
 * not implement unrequested features.
 
 When there is a choice, prefer the smallest clean solution that satisfies the current requirement.
-

@@ -41,5 +41,5 @@ It is not a task manager or productivity dashboard. Its purpose is to keep the u
 
 ## Tech
 
-OnTask is a native macOS application built with **Swift** and **SwiftUI**. OnTask stores task and stopwatch data locally on the user's Mac and does not require a backend or cloud storage.
+OnTask is a native macOS application built with **Swift** and **SwiftUI**. OnTask keeps the current task and stopwatch state only while the app is running and does not require a backend or cloud storage.
 
