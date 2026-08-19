@@ -22,8 +22,8 @@ When OnTask is running:
 * Click the icon to set a current task.
 * The task is displayed directly in the menu bar.
 * Click the task to view its full name and elapsed time.
-* Pause, resume, or restart the timer when needed.
-* Rename the current task without resetting the session.
+* Pause, resume, or restart the stopwatch when needed.
+* Rename the current task without resetting the stopwatch.
 * Mark the task as done or clear it to return to the icon-only state.
 * Quit OnTask to remove it completely from the menu bar.
 
@@ -41,5 +41,5 @@ It is not a task manager or productivity dashboard. Its purpose is to keep the u
 
 ## Tech
 
-OnTask is a native macOS application built with **Swift** and **SwiftUI**. OnTask stores task and timer data locally on the user's Mac and does not require a backend or cloud storage.
+OnTask is a native macOS application built with **Swift** and **SwiftUI**. OnTask stores task and stopwatch data locally on the user's Mac and does not require a backend or cloud storage.
 

@@ -6,14 +6,35 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		03CF0DF530354F09007FD22D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 03CF0DF230354F09007FD22D /* Assets.xcassets */; };
+		03CF0DF730354F09007FD22D /* OnTaskApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03CF0DF430354F09007FD22D /* OnTaskApp.swift */; };
+		03CF0DFA30355E29007FD22D /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 03CF0DF930355E29007FD22D /* README.md */; };
+		03CF0DFB30355E29007FD22D /* AGENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 03CF0DF830355E29007FD22D /* AGENTS.md */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		03CF0DE1303549C0007FD22D /* OnTask.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OnTask.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		03CF0DF230354F09007FD22D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		03CF0DF430354F09007FD22D /* OnTaskApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnTaskApp.swift; sourceTree = "<group>"; };
+		03CF0DF830355E29007FD22D /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
+		03CF0DF930355E29007FD22D /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		03CF0DE3303549C0007FD22D /* OnTask */ = {
+		03CF0DFF303560C1007FD22D /* Views */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = OnTask;
+			path = Views;
+			sourceTree = "<group>";
+		};
+		03CF0E03303564A4007FD22D /* Models */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		03CF0E04303564B4007FD22D /* Services */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Services;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -32,7 +53,13 @@
 		03CF0DD8303549C0007FD22D = {
 			isa = PBXGroup;
 			children = (
-				03CF0DE3303549C0007FD22D /* OnTask */,
+				03CF0DF930355E29007FD22D /* README.md */,
+				03CF0DF830355E29007FD22D /* AGENTS.md */,
+				03CF0DF230354F09007FD22D /* Assets.xcassets */,
+				03CF0DF430354F09007FD22D /* OnTaskApp.swift */,
+				03CF0DFF303560C1007FD22D /* Views */,
+				03CF0E03303564A4007FD22D /* Models */,
+				03CF0E04303564B4007FD22D /* Services */,
 				03CF0DE2303549C0007FD22D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -61,7 +88,9 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				03CF0DE3303549C0007FD22D /* OnTask */,
+				03CF0DFF303560C1007FD22D /* Views */,
+				03CF0E03303564A4007FD22D /* Models */,
+				03CF0E04303564B4007FD22D /* Services */,
 			);
 			name = OnTask;
 			packageProductDependencies = (
@@ -109,6 +138,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				03CF0DFA30355E29007FD22D /* README.md in Resources */,
+				03CF0DFB30355E29007FD22D /* AGENTS.md in Resources */,
+				03CF0DF530354F09007FD22D /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -119,6 +151,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				03CF0DF730354F09007FD22D /* OnTaskApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
