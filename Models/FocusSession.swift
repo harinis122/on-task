@@ -14,8 +14,10 @@ final class FocusSession {
 
     private(set) var currentTask: String?
     private(set) var elapsedTime: TimeInterval = 0
+    private(set) var isStopwatchRunning = false
 
-    @ObservationIgnored private var taskStartedAt: Date?
+    @ObservationIgnored private var accumulatedElapsedTime: TimeInterval = 0
+    @ObservationIgnored private var currentRunStartedAt: Date?
     @ObservationIgnored private var stopwatchTimer: Timer?
 
     var hasCurrentTask: Bool {
@@ -52,15 +54,52 @@ final class FocusSession {
         return true
     }
 
+    func pauseStopwatch() {
+        guard isStopwatchRunning else {
+            return
+        }
+
+        refreshElapsedTime()
+        accumulatedElapsedTime = elapsedTime
+        currentRunStartedAt = nil
+        isStopwatchRunning = false
+        stopRefreshTimer()
+    }
+
+    func resumeStopwatch() {
+        guard currentTask != nil, !isStopwatchRunning else {
+            return
+        }
+
+        currentRunStartedAt = Date()
+        isStopwatchRunning = true
+        startRefreshTimer()
+    }
+
     func completeCurrentTask() {
         currentTask = nil
         resetStopwatch()
     }
 
     private func startStopwatch() {
-        stopwatchTimer?.invalidate()
-        taskStartedAt = Date()
+        stopRefreshTimer()
+        accumulatedElapsedTime = 0
         elapsedTime = 0
+        currentRunStartedAt = Date()
+        isStopwatchRunning = true
+        startRefreshTimer()
+    }
+
+    private func resetStopwatch() {
+        stopRefreshTimer()
+        accumulatedElapsedTime = 0
+        elapsedTime = 0
+        currentRunStartedAt = nil
+        isStopwatchRunning = false
+    }
+
+    private func startRefreshTimer() {
+        stopRefreshTimer()
 
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             self?.refreshElapsedTime()
@@ -70,20 +109,19 @@ final class FocusSession {
         RunLoop.main.add(timer, forMode: .common)
     }
 
-    private func resetStopwatch() {
+    private func stopRefreshTimer() {
         stopwatchTimer?.invalidate()
         stopwatchTimer = nil
-        taskStartedAt = nil
-        elapsedTime = 0
     }
 
     private func refreshElapsedTime(now: Date = Date()) {
-        guard let taskStartedAt else {
-            elapsedTime = 0
+        guard let currentRunStartedAt else {
+            elapsedTime = accumulatedElapsedTime
             return
         }
 
-        elapsedTime = max(0, now.timeIntervalSince(taskStartedAt))
+        let currentRunElapsedTime = max(0, now.timeIntervalSince(currentRunStartedAt))
+        elapsedTime = accumulatedElapsedTime + currentRunElapsedTime
     }
 
     private static func formatElapsedTime(_ elapsedTime: TimeInterval) -> String {
