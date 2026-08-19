@@ -12,6 +12,8 @@ struct MenuView: View {
     let focusSession: FocusSession
 
     @State private var taskText = ""
+    @State private var isRenamingTask = false
+    @State private var renameText = ""
 
     var body: some View {
         VStack(spacing: 12) {
@@ -52,13 +54,64 @@ struct MenuView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            if isRenamingTask {
+                renameTaskView
+            } else {
+                activeTaskView(currentTask)
+            }
+        }
+    }
+
+    private func activeTaskView(_ currentTask: String) -> some View {
+        VStack(spacing: 10) {
             Text(currentTask)
                 .font(.headline)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
+            Text(focusSession.elapsedTimeText)
+                .font(.system(.title2, design: .monospaced))
+
+            if focusSession.isStopwatchRunning {
+                Button("Pause") {
+                    focusSession.pauseStopwatch()
+                }
+            } else {
+                Button("Resume") {
+                    focusSession.resumeStopwatch()
+                }
+            }
+
+            Button("Restart") {
+                focusSession.restartStopwatch()
+            }
+
+            Button("Rename task") {
+                beginRename(currentTask)
+            }
+
             Button("Done") {
                 focusSession.completeCurrentTask()
+                cancelRename()
+            }
+        }
+    }
+
+    private var renameTaskView: some View {
+        VStack(spacing: 10) {
+            TextField("Current task", text: $renameText)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit(saveRename)
+
+            HStack(spacing: 8) {
+                Button("Save") {
+                    saveRename()
+                }
+                .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                Button("Cancel") {
+                    cancelRename()
+                }
             }
         }
     }
@@ -69,5 +122,23 @@ struct MenuView: View {
         }
 
         taskText = ""
+    }
+
+    private func beginRename(_ currentTask: String) {
+        renameText = currentTask
+        isRenamingTask = true
+    }
+
+    private func saveRename() {
+        guard focusSession.renameTask(renameText) else {
+            return
+        }
+
+        cancelRename()
+    }
+
+    private func cancelRename() {
+        renameText = ""
+        isRenamingTask = false
     }
 }

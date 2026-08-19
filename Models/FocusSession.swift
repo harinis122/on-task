@@ -76,6 +76,30 @@ final class FocusSession {
         startRefreshTimer()
     }
 
+    func restartStopwatch() {
+        guard currentTask != nil else {
+            return
+        }
+
+        startStopwatch()
+    }
+
+    @discardableResult
+    func renameTask(_ taskText: String) -> Bool {
+        guard currentTask != nil else {
+            return false
+        }
+
+        let trimmedTask = taskText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedTask.isEmpty else {
+            return false
+        }
+
+        currentTask = trimmedTask
+        return true
+    }
+
     func completeCurrentTask() {
         currentTask = nil
         resetStopwatch()
