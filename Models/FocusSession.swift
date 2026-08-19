@@ -42,4 +42,8 @@ final class FocusSession {
         currentTask = trimmedTask
         return true
     }
+
+    func completeCurrentTask() {
+        currentTask = nil
+    }
 }

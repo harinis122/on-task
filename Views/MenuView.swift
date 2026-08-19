@@ -47,7 +47,7 @@ struct MenuView: View {
     }
 
     private func currentTaskView(_ currentTask: String) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             Text("Current task")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -56,6 +56,10 @@ struct MenuView: View {
                 .font(.headline)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Button("Done") {
+                focusSession.completeCurrentTask()
+            }
         }
     }
 
