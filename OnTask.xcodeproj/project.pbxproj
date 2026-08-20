@@ -32,11 +32,6 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
-		03CF0E04303564B4007FD22D /* Services */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Services;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,7 +54,6 @@
 				03CF0DF430354F09007FD22D /* OnTaskApp.swift */,
 				03CF0DFF303560C1007FD22D /* Views */,
 				03CF0E03303564A4007FD22D /* Models */,
-				03CF0E04303564B4007FD22D /* Services */,
 				03CF0DE2303549C0007FD22D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,7 +84,6 @@
 			fileSystemSynchronizedGroups = (
 				03CF0DFF303560C1007FD22D /* Views */,
 				03CF0E03303564A4007FD22D /* Models */,
-				03CF0E04303564B4007FD22D /* Services */,
 			);
 			name = OnTask;
 			packageProductDependencies = (

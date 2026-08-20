@@ -26,7 +26,7 @@ struct MenuView: View {
             Divider()
 
             Button("Quit OnTask") {
-                NSApplication.shared.terminate(nil)
+                requestQuit()
             }
             .keyboardShortcut("q")
         }
@@ -140,5 +140,29 @@ struct MenuView: View {
     private func cancelRename() {
         renameText = ""
         isRenamingTask = false
+    }
+
+    private func requestQuit() {
+        guard focusSession.requiresQuitConfirmation else {
+            terminateApp()
+            return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = "Quit OnTask?"
+        alert.informativeText = "Quitting will discard your current task and stopwatch state. This in-memory session cannot be restored."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Cancel")
+        alert.buttons.first?.keyEquivalent = ""
+        alert.buttons.last?.keyEquivalent = "\u{1b}"
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            terminateApp()
+        }
+    }
+
+    private func terminateApp() {
+        NSApplication.shared.terminate(nil)
     }
 }

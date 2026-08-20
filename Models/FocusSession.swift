@@ -24,6 +24,10 @@ final class FocusSession {
         currentTask != nil
     }
 
+    var requiresQuitConfirmation: Bool {
+        hasCurrentTask
+    }
+
     var elapsedTimeText: String {
         Self.formatElapsedTime(elapsedTime)
     }
