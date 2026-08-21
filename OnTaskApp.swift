@@ -12,10 +12,12 @@ import SwiftUI
 struct OnTaskApp: App {
     @State private var focusSession = FocusSession()
 
+    // Configures OnTask as a menu-bar accessory app.
     init() {
         NSApplication.shared.setActivationPolicy(.accessory)
     }
 
+    // Builds the menu-bar scene and task label.
     var body: some Scene {
         MenuBarExtra {
             MenuView(focusSession: focusSession)

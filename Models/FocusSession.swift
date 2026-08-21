@@ -1,7 +1,7 @@
 //
 //  FocusSession.swift
 //  OnTask
-//  Purpose: Source of truth for the current focus session.
+//  Purpose: Source of truth/logic for the current focus session.
 //  Created by Harini Suresh on 8/18/26.
 //
 
@@ -20,18 +20,22 @@ final class FocusSession {
     @ObservationIgnored private var currentRunStartedAt: Date?
     @ObservationIgnored private var stopwatchTimer: Timer?
 
+    // Reports whether a task is currently active.
     var hasCurrentTask: Bool {
         currentTask != nil
     }
 
+    // Indicates whether quitting needs user confirmation.
     var requiresQuitConfirmation: Bool {
         hasCurrentTask
     }
 
+    // Formats elapsed time for menu display.
     var elapsedTimeText: String {
         Self.formatElapsedTime(elapsedTime)
     }
 
+    // Provides a shortened menu-bar task title.
     var menuBarTaskTitle: String? {
         guard let currentTask else {
             return nil
@@ -45,6 +49,7 @@ final class FocusSession {
         return "\(truncatedText)..."
     }
 
+    // Validates and starts a new focus task.
     @discardableResult
     func startTask(_ taskText: String) -> Bool {
         let trimmedTask = taskText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -58,6 +63,7 @@ final class FocusSession {
         return true
     }
 
+    // Pauses timing and stores accumulated elapsed time.
     func pauseStopwatch() {
         guard isStopwatchRunning else {
             return
@@ -70,6 +76,7 @@ final class FocusSession {
         stopRefreshTimer()
     }
 
+    // Resumes timing from accumulated elapsed time.
     func resumeStopwatch() {
         guard currentTask != nil, !isStopwatchRunning else {
             return
@@ -80,6 +87,7 @@ final class FocusSession {
         startRefreshTimer()
     }
 
+    // Restarts timing for the current task.
     func restartStopwatch() {
         guard currentTask != nil else {
             return
@@ -88,6 +96,7 @@ final class FocusSession {
         startStopwatch()
     }
 
+    // Renames the task without changing timing.
     @discardableResult
     func renameTask(_ taskText: String) -> Bool {
         guard currentTask != nil else {
@@ -104,11 +113,13 @@ final class FocusSession {
         return true
     }
 
+    // Clears the task and resets timer state.
     func completeCurrentTask() {
         currentTask = nil
         resetStopwatch()
     }
 
+    // Initializes a fresh running stopwatch state.
     private func startStopwatch() {
         stopRefreshTimer()
         accumulatedElapsedTime = 0
@@ -118,6 +129,7 @@ final class FocusSession {
         startRefreshTimer()
     }
 
+    // Clears all stopwatch state to inactive.
     private func resetStopwatch() {
         stopRefreshTimer()
         accumulatedElapsedTime = 0
@@ -126,6 +138,7 @@ final class FocusSession {
         isStopwatchRunning = false
     }
 
+    // Starts UI refresh ticks for elapsed time.
     private func startRefreshTimer() {
         stopRefreshTimer()
 
@@ -137,11 +150,13 @@ final class FocusSession {
         RunLoop.main.add(timer, forMode: .common)
     }
 
+    // Stops any active elapsed-time refresh timer.
     private func stopRefreshTimer() {
         stopwatchTimer?.invalidate()
         stopwatchTimer = nil
     }
 
+    // Recalculates elapsed time from timestamps.
     private func refreshElapsedTime(now: Date = Date()) {
         guard let currentRunStartedAt else {
             elapsedTime = accumulatedElapsedTime
@@ -152,10 +167,16 @@ final class FocusSession {
         elapsedTime = accumulatedElapsedTime + currentRunElapsedTime
     }
 
+    // Converts elapsed seconds into display text.
     private static func formatElapsedTime(_ elapsedTime: TimeInterval) -> String {
         let totalSeconds = Int(elapsedTime)
-        let minutes = totalSeconds / 60
+        let hours = totalSeconds / 3_600
+        let minutes = (totalSeconds % 3_600) / 60
         let seconds = totalSeconds % 60
+
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        }
 
         return String(format: "%02d:%02d", minutes, seconds)
     }

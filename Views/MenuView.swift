@@ -15,6 +15,7 @@ struct MenuView: View {
     @State private var isRenamingTask = false
     @State private var renameText = ""
 
+    // Displays task controls and quit access.
     var body: some View {
         VStack(spacing: 12) {
             if let currentTask = focusSession.currentTask {
@@ -34,6 +35,7 @@ struct MenuView: View {
         .frame(width: 260)
     }
 
+    // Shows the empty-state task creation form.
     private var noTaskView: some View {
         VStack(spacing: 10) {
             Text("What are you doing?")
@@ -48,6 +50,7 @@ struct MenuView: View {
         }
     }
 
+    // Chooses active display or rename editor.
     private func currentTaskView(_ currentTask: String) -> some View {
         VStack(spacing: 10) {
             Text("Current task")
@@ -62,6 +65,7 @@ struct MenuView: View {
         }
     }
 
+    // Displays task, timer, and session controls.
     private func activeTaskView(_ currentTask: String) -> some View {
         VStack(spacing: 10) {
             Text(currentTask)
@@ -97,6 +101,7 @@ struct MenuView: View {
         }
     }
 
+    // Shows controls for editing the task name.
     private var renameTaskView: some View {
         VStack(spacing: 10) {
             TextField("Current task", text: $renameText)
@@ -116,6 +121,7 @@ struct MenuView: View {
         }
     }
 
+    // Starts a validated task through FocusSession.
     private func startTask() {
         guard focusSession.startTask(taskText) else {
             return
@@ -124,11 +130,13 @@ struct MenuView: View {
         taskText = ""
     }
 
+    // Enters rename mode with current text.
     private func beginRename(_ currentTask: String) {
         renameText = currentTask
         isRenamingTask = true
     }
 
+    // Saves a valid renamed task value.
     private func saveRename() {
         guard focusSession.renameTask(renameText) else {
             return
@@ -137,11 +145,13 @@ struct MenuView: View {
         cancelRename()
     }
 
+    // Exits rename mode without session changes.
     private func cancelRename() {
         renameText = ""
         isRenamingTask = false
     }
 
+    // Confirms destructive quit when a task exists.
     private func requestQuit() {
         guard focusSession.requiresQuitConfirmation else {
             terminateApp()
@@ -162,6 +172,7 @@ struct MenuView: View {
         }
     }
 
+    // Terminates OnTask through the shared application.
     private func terminateApp() {
         NSApplication.shared.terminate(nil)
     }
