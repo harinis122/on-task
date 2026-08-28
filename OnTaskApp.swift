@@ -97,7 +97,7 @@ final class OnTaskAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegat
             statusItem.length = NSStatusItem.variableLength
         } else {
             button.title = ""
-            button.image = statusIconImage(color: .controlAccentColor)
+            button.image = statusIconImage(color: .black)
             button.contentTintColor = nil
             button.layer?.backgroundColor = NSColor.clear.cgColor
             statusItem.length = 28
