@@ -11,7 +11,7 @@ import SwiftUI
 struct OutlineButtonStyle: ButtonStyle {
     let isPrimary: Bool
 
-    // Stores whether the button should appear primary.
+    // Stores whether the button should appear primary (macOS accent color).
     init(isPrimary: Bool = false) {
         self.isPrimary = isPrimary
     }
@@ -25,7 +25,7 @@ struct OutlineButtonStyle: ButtonStyle {
             .foregroundStyle(isPrimary ? Color.white : Color.primary)
             .background(
                 RoundedRectangle(cornerRadius: 7)
-                    .fill(isPrimary ? Color.accentColor : Color.clear)
+                    .fill(isPrimary ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 7)
