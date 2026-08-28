@@ -8,6 +8,33 @@
 import AppKit
 import SwiftUI
 
+struct OutlineButtonStyle: ButtonStyle {
+    let isPrimary: Bool
+
+    // Stores whether the button should appear primary.
+    init(isPrimary: Bool = false) {
+        self.isPrimary = isPrimary
+    }
+
+    // Builds an adaptive rounded button appearance.
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: isPrimary ? .semibold : .regular))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .foregroundStyle(isPrimary ? Color.white : Color.primary)
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(isPrimary ? Color.accentColor : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(Color.primary.opacity(isPrimary ? 0 : 0.18), lineWidth: 1)
+            )
+            .opacity(configuration.isPressed ? 0.65 : 1.0)
+    }
+}
+
 struct MenuView: View {
     let focusSession: FocusSession
 
@@ -17,7 +44,7 @@ struct MenuView: View {
 
     // Displays task controls and quit access.
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             if let currentTask = focusSession.currentTask {
                 currentTaskView(currentTask)
             } else {
@@ -25,38 +52,40 @@ struct MenuView: View {
             }
 
             Divider()
+                .opacity(0.45)
 
             Button("Quit OnTask") {
                 requestQuit()
             }
+            .buttonStyle(OutlineButtonStyle())
             .keyboardShortcut("q")
         }
-        .padding()
-        .frame(width: 260)
+        .padding(10)
+        .frame(width: 224)
+        .foregroundStyle(Color.primary)
     }
 
     // Shows the empty-state task creation form.
     private var noTaskView: some View {
         VStack(spacing: 10) {
-            Text("What are you doing?")
+            Text("What's your current task?")
                 .font(.headline)
 
-            TextField("Current task", text: $taskText)
+            TextField("e.g. Finish report", text: $taskText)
                 .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: .infinity)
                 .onSubmit(startTask)
 
             Button("Start Task", action: startTask)
+                .buttonStyle(OutlineButtonStyle(isPrimary: true))
                 .disabled(taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
+        .frame(maxWidth: .infinity)
     }
 
     // Chooses active display or rename editor.
     private func currentTaskView(_ currentTask: String) -> some View {
-        VStack(spacing: 10) {
-            Text("Current task")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
+        VStack(alignment: .leading, spacing: 6) {
             if isRenamingTask {
                 renameTaskView
             } else {
@@ -67,43 +96,59 @@ struct MenuView: View {
 
     // Displays task, timer, and session controls.
     private func activeTaskView(_ currentTask: String) -> some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             Text(currentTask)
-                .font(.headline)
+                .font(.system(size: 14, weight: .bold))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(focusSession.elapsedTimeText)
-                .font(.system(.title2, design: .monospaced))
+                .font(.system(size: 22, weight: .regular, design: .monospaced))
 
             if focusSession.isStopwatchRunning {
-                Button("Pause") {
+                Button {
                     focusSession.pauseStopwatch()
+                } label: {
+                    Label("Pause", systemImage: "pause")
                 }
+                .buttonStyle(OutlineButtonStyle(isPrimary: true))
             } else {
-                Button("Resume") {
+                Button {
                     focusSession.resumeStopwatch()
+                } label: {
+                    Label("Resume", systemImage: "play")
                 }
+                .buttonStyle(OutlineButtonStyle(isPrimary: true))
             }
 
-            Button("Restart") {
+            Button {
                 focusSession.restartStopwatch()
+            } label: {
+                Label("Restart", systemImage: "arrow.clockwise")
             }
+            .buttonStyle(OutlineButtonStyle())
 
-            Button("Rename task") {
+            Button {
                 beginRename(currentTask)
+            } label: {
+                Label("Rename task", systemImage: "pencil")
             }
+            .buttonStyle(OutlineButtonStyle())
 
-            Button("Done") {
+            Button {
                 focusSession.completeCurrentTask()
                 cancelRename()
+            } label: {
+                Label("Done", systemImage: "checkmark")
             }
+            .buttonStyle(OutlineButtonStyle())
         }
+        .frame(maxWidth: .infinity)
     }
 
     // Shows controls for editing the task name.
     private var renameTaskView: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             TextField("Current task", text: $renameText)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(saveRename)
@@ -112,11 +157,13 @@ struct MenuView: View {
                 Button("Save") {
                     saveRename()
                 }
+                .buttonStyle(OutlineButtonStyle(isPrimary: true))
                 .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                 Button("Cancel") {
                     cancelRename()
                 }
+                .buttonStyle(OutlineButtonStyle())
             }
         }
     }
