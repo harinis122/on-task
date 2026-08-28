@@ -70,7 +70,9 @@ It's not a task manager or productivity dashboard. Its purpose is to keep your *
 
 2. Open the Xcode project:
 
-```open OnTask.xcodeproj```
+   ```bash
+   open OnTask.xcodeproj
+   ```
 
 3. In Xcode, select My Mac as the run destination.
 
