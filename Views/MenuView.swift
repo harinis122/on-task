@@ -1,7 +1,7 @@
 //
 //  MenuView.swift
 //  OnTask
-//  Purpose: Main menu-bar UI for the current MVP milestone.
+//  Purpose: Main menu-bar UI.
 //  Created by Harini Suresh on 8/18/26.
 //
 
@@ -49,6 +49,13 @@ struct MenuView: View {
                 currentTaskView(currentTask)
             } else {
                 noTaskView
+            }
+
+            if focusSession.hasCurrentTask {
+                Divider()
+                    .opacity(0.45)
+
+                stopwatchVisibilityToggle
             }
 
             Divider()
@@ -102,8 +109,7 @@ struct MenuView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text(focusSession.elapsedTimeText)
-                .font(.system(size: 22, weight: .regular, design: .monospaced))
+            stopwatchDisplay
 
             if focusSession.isStopwatchRunning {
                 Button {
@@ -144,6 +150,56 @@ struct MenuView: View {
             .buttonStyle(OutlineButtonStyle())
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // Shows elapsed time or hidden indicator.
+    private var stopwatchDisplay: some View {
+        Group {
+            if focusSession.isStopwatchVisible {
+                Text(focusSession.elapsedTimeText)
+                    .font(.system(size: 22, weight: .regular, design: .monospaced))
+            } else {
+                Image(systemName: "eye.slash")
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Stopwatch hidden")
+            }
+        }
+        .frame(height: 27)
+    }
+
+    // Shows switch for stopwatch visibility.
+    private var stopwatchVisibilityToggle: some View {
+        HStack {
+            Text("Show stopwatch")
+                .font(.system(size: 15, weight: .regular))
+
+            Spacer()
+
+            Toggle("", isOn: stopwatchVisibilityBinding)
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .scaleEffect(0.9)
+                .tint(Color(nsColor: .controlAccentColor))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, -2)
+    }
+
+    // Bridges toggle changes to FocusSession behavior.
+    private var stopwatchVisibilityBinding: Binding<Bool> {
+        Binding(
+            get: {
+                focusSession.isStopwatchVisible
+            },
+            set: { isVisible in
+                guard focusSession.isStopwatchVisible != isVisible else {
+                    return
+                }
+
+                focusSession.toggleStopwatchVisibility()
+            }
+        )
     }
 
     // Shows controls for editing the task name.

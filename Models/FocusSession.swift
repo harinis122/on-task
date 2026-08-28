@@ -15,6 +15,7 @@ final class FocusSession {
     private(set) var currentTask: String?
     private(set) var elapsedTime: TimeInterval = 0
     private(set) var isStopwatchRunning = false
+    private(set) var isStopwatchVisible = true
 
     @ObservationIgnored private var accumulatedElapsedTime: TimeInterval = 0
     @ObservationIgnored private var currentRunStartedAt: Date?
@@ -96,6 +97,11 @@ final class FocusSession {
         startStopwatch()
     }
 
+    // Toggles whether elapsed time is displayed.
+    func toggleStopwatchVisibility() {
+        isStopwatchVisible.toggle()
+    }
+
     // Renames the task without changing timing.
     @discardableResult
     func renameTask(_ taskText: String) -> Bool {
@@ -126,6 +132,7 @@ final class FocusSession {
         elapsedTime = 0
         currentRunStartedAt = Date()
         isStopwatchRunning = true
+        isStopwatchVisible = true
         startRefreshTimer()
     }
 
@@ -136,6 +143,7 @@ final class FocusSession {
         elapsedTime = 0
         currentRunStartedAt = nil
         isStopwatchRunning = false
+        isStopwatchVisible = true
     }
 
     // Starts UI refresh ticks for elapsed time.
