@@ -32,6 +32,11 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		03CF0E9B30418695007FD22D /* screenshots */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = screenshots;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -48,6 +53,7 @@
 		03CF0DD8303549C0007FD22D = {
 			isa = PBXGroup;
 			children = (
+				03CF0E9B30418695007FD22D /* screenshots */,
 				03CF0DF930355E29007FD22D /* README.md */,
 				03CF0DF830355E29007FD22D /* AGENTS.md */,
 				03CF0DF230354F09007FD22D /* Assets.xcassets */,
@@ -84,6 +90,7 @@
 			fileSystemSynchronizedGroups = (
 				03CF0DFF303560C1007FD22D /* Views */,
 				03CF0E03303564A4007FD22D /* Models */,
+				03CF0E9B30418695007FD22D /* screenshots */,
 			);
 			name = OnTask;
 			packageProductDependencies = (
