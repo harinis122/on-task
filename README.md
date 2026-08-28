@@ -2,7 +2,7 @@
 
 OnTask is a macOS menu bar app that helps you stay conscious of what you're doing right now.
 
-<img width="512" height="512" alt="OnTask" src="https://github.com/user-attachments/assets/9f414750-118d-45f9-bb5b-db11fcbfd254" />
+<img width="100" height="100" alt="OnTask" src="https://github.com/user-attachments/assets/9f414750-118d-45f9-bb5b-db11fcbfd254" />
 
 
 ## Why OnTask Exists
