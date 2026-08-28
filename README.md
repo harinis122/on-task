@@ -21,7 +21,7 @@ When OnTask is running:
 * If no task is set, a small icon appears in the macOS menu bar.
 * Click the icon to set a current task.
 * The task is displayed directly in the menu bar.
-* Choose a color for the menu-bar icon/task display.
+* The menu bar view, task color, and icon color are consistant with the macOS color theme.
 * Click the task to view its full name and elapsed time.
 * Pause, resume, or restart the stopwatch when needed.
 * Rename the current task without resetting the stopwatch.

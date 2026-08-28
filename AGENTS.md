@@ -609,11 +609,10 @@ The MVP architecture is:
                          OnTaskApp
                             │
                             ▼
-                   ┌────────────────────┐
-                   │    FocusSession    │
-                   │ AppearanceSettings │
-                   │      (Model)       │
-                   └───────┬────────────┘
+                    ┌────────────────┐
+                    │  FocusSession  │
+                    │    (Model)     │
+                    └───────┬────────┘
                          ▲   │
                          │   │
              reads state │   │ state changes
@@ -665,7 +664,6 @@ OnTask/
 │
 ├── Models/
 │   └── FocusSession.swift
-│   └── AppearanceSettings.swift
 │
 ├── OnTaskApp.swift
 └── Assets.xcassets/
@@ -1798,13 +1796,3 @@ A good OnTask change should:
 
 When there is a choice, prefer the smallest clean solution that satisfies the current requirement.
 
----
-
-# 63. Appearance Settings
-OnTask supports a user-selectable appearance color for the menu-bar icon/task display.
-
-- `AppearanceSettings` is the single source of truth for appearance preferences.
-- Appearance state must remain separate from `FocusSession`.
-- `MenuView` owns the visual controls used to change appearance, such as `ColorPicker`.
-- `FocusSession` must not contain appearance-related state or logic.
-- Appearance preferences may persist across launches because they represent user preferences, not temporary focus-session state.
