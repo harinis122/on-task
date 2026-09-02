@@ -97,19 +97,19 @@ final class OnTaskAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegat
             statusItem.length = NSStatusItem.variableLength
         } else {
             button.title = ""
-            button.image = statusIconImage(color: .black)
+            button.image = statusIconImage()
             button.contentTintColor = nil
             button.layer?.backgroundColor = NSColor.clear.cgColor
             statusItem.length = 28
         }
     }
 
-    // Draws checked icon using system accent color.
-    private func statusIconImage(color: NSColor) -> NSImage {
+    // Draws template icon for system contrast.
+    private func statusIconImage() -> NSImage {
         let image = NSImage(size: NSSize(width: 18, height: 18))
 
         image.lockFocus()
-        color.setStroke()
+        NSColor.black.setStroke()
 
         let boxPath = NSBezierPath(roundedRect: NSRect(x: 2.5, y: 2.5, width: 13, height: 13), xRadius: 2.5, yRadius: 2.5)
         boxPath.lineWidth = 1.7
@@ -125,7 +125,7 @@ final class OnTaskAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegat
         checkPath.stroke()
 
         image.unlockFocus()
-        image.isTemplate = false
+        image.isTemplate = true // tells macOS to apply template-image rendering rules
         return image
     }
 
