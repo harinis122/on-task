@@ -71,6 +71,13 @@ There may be zero or one current task.
 
 There is never more than one active task in the MVP.
 
+A task may be timed with either:
+
+* a **Stopwatch**, which counts active time upward, or
+* a **Timer**, which counts active time down from a configured duration.
+
+Stopwatch and Timer are two timing modes for the same focus session. They are not separate task concepts.
+
 The application should favor simplicity over feature richness.
 
 When choosing between:
@@ -120,9 +127,7 @@ Task text should be truncated when necessary.
 
 The display limit should be centralized rather than hard-coded throughout the UI.
 
-Target approximately **5–20 visible characters** for the menu bar representation.
-
-The full task name must remain available inside the menu.
+Target approximately **5-20 visible characters** for the menu bar representation.
 
 Example:
 
@@ -131,6 +136,8 @@ Finish database...
 ```
 
 Do not let long task names consume excessive menu bar width.
+
+The menu bar should not permanently display elapsed or remaining time unless explicitly requested. Detailed timing information belongs inside the menu.
 
 ---
 
@@ -152,9 +159,33 @@ For the current MVP, `MenuView` may contain the complete OnTask interface.
 
 ---
 
-# 6. No-Task UI
+# 6. No-Task UI and Timing Choice
 
 When there is no current task, `MenuView` should provide a minimal interface for creating one.
+
+The user enters:
+
+* task text,
+* timing mode.
+
+The timing modes should appear side-by-side:
+
+```text
+[ Stopwatch ] [ Timer ]
+```
+
+Stopwatch is selected by default.
+
+If Timer is selected, reveal a field below the selector:
+
+```text
+How many minutes?
+[ 25 ]
+```
+
+Switching back to Stopwatch hides the minutes field.
+
+Do not create another setup screen.
 
 Conceptually:
 
@@ -163,6 +194,11 @@ Conceptually:
 │ What are you doing?     │
 │                         │
 │ [____________________]  │
+│                         │
+│ [ Stopwatch ] [ Timer ] │
+│                         │
+│ How many minutes?       │
+│ [ 25 ]                  │
 │                         │
 │       Start Task        │
 │                         │
@@ -188,13 +224,18 @@ Do not introduce unnecessary configuration before the task can be started.
 When a current task exists, the menu should display:
 
 * the full task name,
-* elapsed task time,
-* timer state,
+* displayed time,
+* timing state,
 * pause/resume control,
 * restart control,
 * rename/change-task control,
 * done/clear control,
 * quit control.
+
+Displayed time means:
+
+* elapsed active time for Stopwatch,
+* remaining active time for Timer.
 
 Conceptually:
 
@@ -248,9 +289,10 @@ The current focus session should conceptually contain enough information to repr
 
 ```text
 task text
-timer state
-start/resume timestamps
-previously accumulated elapsed time
+selected TimingMode
+configured Timer duration when applicable
+SessionClock state
+Timer expiration state when applicable
 ```
 
 The exact internal representation may vary if a cleaner implementation exists.
@@ -261,7 +303,7 @@ The exact internal representation may vary if a cleaner implementation exists.
 
 A focus session exists only while OnTask is running.
 
-Current task and timer state are **in-memory session state**.
+Current task and timing state are **in-memory session state**.
 
 The MVP does not persist an active focus session between application launches.
 
@@ -272,7 +314,7 @@ Launch OnTask
       ↓
 New empty FocusSession
       ↓
-Set task
+Set task and choose timing mode
       ↓
 Work on task
       ↓
@@ -289,11 +331,12 @@ A fresh application launch should begin with:
 
 ```text
 currentTask = none
-timer = inactive
-elapsedTime = 0
+TimingMode = default Stopwatch for the next task entry
+SessionClock = inactive
+expirationState = not expired
 ```
 
-Do not restore the previous task or stopwatch when the app relaunches.
+Do not restore the previous task, timing mode, configured duration, elapsed time, remaining time, or expiration state when the app relaunches.
 
 ---
 
@@ -302,9 +345,11 @@ Do not restore the previous task or stopwatch when the app relaunches.
 Starting a task should:
 
 1. validate that meaningful task text exists,
-2. set that text as the current task,
-3. begin the task stopwatch,
-4. update the menu bar label.
+2. validate Timer minutes if Timer mode is selected,
+3. set the task text as the current task,
+4. set the selected `TimingMode`,
+5. start a fresh `SessionClock`,
+6. update the menu bar label.
 
 Whitespace-only task names should not become valid tasks.
 
@@ -312,90 +357,95 @@ Avoid unnecessary validation beyond what is useful for this small app.
 
 ---
 
-# 11. Renaming a Task
+# 11. Timer Input
 
-Renaming changes the description of the current task.
+Timer mode requires a positive whole number of minutes.
 
-It does **not** create a new task session.
+Reject:
 
-Most importantly:
+* empty input,
+* zero,
+* negative values,
+* non-numeric values.
 
-> **Renaming a task must not reset its stopwatch.**
+Keep validation simple.
+
+Do not add advanced duration parsing unless explicitly requested.
+
+---
+
+# 12. TimingMode
+
+`TimingMode` describes how `SessionClock` elapsed time is interpreted.
+
+Conceptually:
+
+```swift
+enum TimingMode {
+    case stopwatch
+    case timer(duration: TimeInterval)
+}
+```
+
+Exact Swift syntax is not required by this document.
+
+For Stopwatch:
+
+```text
+displayedTime = activeElapsedTime
+```
+
+For Timer:
+
+```text
+displayedTime = max(configuredDuration - activeElapsedTime, 0)
+```
+
+This is why both modes can share `SessionClock`.
+
+`TimingMode` should not own low-level timestamp mechanics.
+
+---
+
+# 13. SessionClock
+
+`SessionClock` owns reusable timekeeping mechanics.
+
+Its main question is:
+
+> **How much active time has passed?**
+
+Responsibilities include:
+
+* current run/start timestamp,
+* accumulated active elapsed duration,
+* running/paused state,
+* start,
+* pause,
+* resume,
+* restart,
+* elapsed-time calculation.
+
+`SessionClock` does **not** know whether it is being used as a Stopwatch or Timer.
 
 Example:
 
 ```text
-Before:
-"Work on homework"
-Elapsed: 18:42
+Start at 2:00
+Pause at 2:10
+Active elapsed = 10 minutes
 
-Rename to:
-"Finish ICS homework"
+Remain paused until 2:30
+Active elapsed remains 10 minutes
 
-After:
-"Finish ICS homework"
-Elapsed: 18:42
+Resume at 2:30
+Current time = 2:35
+Active elapsed = 15 minutes
 ```
 
-Renaming should preserve:
+Do **not** design the clock around incrementing a permanent counter every second.
 
-* elapsed time,
-* running/paused state,
-* accumulated duration,
-* current timer start/resume timestamp.
-
-Do not implement rename by clearing the task and creating a new one.
-
----
-
-# 12. Completing / Clearing a Task
-
-For the MVP, marking the task as done and clearing the current task lead to the same resulting focus state:
-
-```text
-No Current Task
-```
-
-Clearing/completing should:
-
-1. remove the current task,
-2. reset timer state,
-3. reset accumulated elapsed time,
-4. remove task text from the menu bar,
-5. return the menu bar to the icon-only state.
-
-Do not retain a task history in the MVP.
-
-After clearing:
-
-```text
-currentTask = none
-elapsedTime = 0
-timer = inactive
-```
-
----
-
-# 13. Stopwatch Requirements
-
-Each active task has a stopwatch.
-
-The stopwatch must support:
-
-* start,
-* pause,
-* resume,
-* restart.
-
-The stopwatch measures how long the current focus session has been active.
-
----
-
-# 14. Stopwatch Architecture
-
-Do **not** design the stopwatch around incrementing a permanent counter every second.
-
-Avoid making the timer itself conceptually:
+Avoid making timekeeping conceptually:
 
 ```text
 421
@@ -407,7 +457,7 @@ Avoid making the timer itself conceptually:
 
 with every UI tick treated as a business-state mutation.
 
-Instead, use timestamps and accumulated elapsed duration.
+Instead, use timestamps and accumulated active elapsed duration.
 
 Conceptually:
 
@@ -417,37 +467,80 @@ elapsed duration before current run
 (current time - current run start time)
 ```
 
-For example:
+The UI may refresh frequently enough to display a natural time readout.
 
-```text
-Task resumed at: 10:00:00
-Current time:    10:07:32
-
-Current run duration = 7m 32s
-```
-
-If 12 minutes had already accumulated before resume:
-
-```text
-12:00 + 7:32 = 19:32
-```
-
-The UI may refresh frequently enough to display a natural stopwatch.
-
-The underlying timer logic belongs in `FocusSession`.
+Reusable timestamp and elapsed-time mechanics belong in `SessionClock`, not duplicated independently in `FocusSession` or `MenuView`.
 
 ---
 
-# 15. Pause Semantics
+# 14. Stopwatch Behavior
 
-When the stopwatch is running and the user pauses it:
+Stopwatch counts upward from zero.
 
-1. calculate elapsed time accumulated during the current run,
-2. add that duration to previously accumulated elapsed time,
-3. mark the stopwatch as paused,
-4. stop increasing displayed elapsed time.
+When a task starts in Stopwatch mode:
 
-While paused, wall-clock time should not increase task elapsed time.
+```text
+displayedTime = 00:00
+```
+
+Stopwatch supports:
+
+* start,
+* pause,
+* resume,
+* restart.
+
+Restart resets active elapsed time to zero and immediately runs again.
+
+---
+
+# 15. Countdown Timer Behavior
+
+Timer counts downward from the configured duration.
+
+Example:
+
+```text
+Configured: 25:00
+Active elapsed: 07:00
+Displayed remaining: 18:00
+```
+
+Conceptually:
+
+```text
+remainingTime = max(configuredDuration - activeElapsedTime, 0)
+```
+
+Timer supports:
+
+* start,
+* pause,
+* resume,
+* restart.
+
+Remaining time must not decrease while paused.
+
+Timer must never display below:
+
+```text
+00:00
+```
+
+Restart restores the original configured duration and starts running immediately.
+
+---
+
+# 16. Pause Semantics
+
+When the timing mode is running and the user pauses it:
+
+1. calculate active elapsed time accumulated during the current run,
+2. add that duration to previously accumulated active elapsed time,
+3. mark the `SessionClock` as paused,
+4. stop increasing active elapsed time.
+
+While paused, wall-clock time should not increase active task time.
 
 Example:
 
@@ -455,71 +548,192 @@ Example:
 8:00 start
 8:10 pause
 
-Elapsed = 10 minutes
+Active elapsed = 10 minutes
 
-8:10–8:30 remains paused
+8:10-8:30 remains paused
 
-Elapsed at 8:30 = still 10 minutes
+Active elapsed at 8:30 = still 10 minutes
 ```
 
+For Timer mode, remaining time should stay frozen while paused.
+
 ---
 
-# 16. Resume Semantics
+# 17. Resume Semantics
 
-Resuming a paused task should:
+Resuming a paused focus session should:
 
-1. preserve already accumulated elapsed time,
+1. preserve already accumulated active elapsed time,
 2. record the new resume/start timestamp,
-3. mark the stopwatch as running,
-4. continue accumulating from that point.
+3. mark the `SessionClock` as running,
+4. continue accumulating active elapsed time from that point.
 
-Resume must not reset elapsed time.
+Resume must not reset Stopwatch elapsed time or Timer remaining time.
 
 ---
 
-# 17. Restart Semantics
+# 18. Restart Semantics
 
-Restarting the stopwatch means:
+Restarting keeps the same current task, resets active elapsed time to zero, and begins timing immediately.
 
-> **Keep the same current task, but reset its elapsed time to zero and begin timing again.**
+Stopwatch example:
+
+```text
+elapsed = 17:00
+Restart
+→ SessionClock elapsed = 0
+→ display = 00:00
+→ running
+```
+
+25-minute Timer example:
+
+```text
+elapsed = 17:00
+remaining = 08:00
+Restart
+→ SessionClock elapsed = 0
+→ remaining = 25:00
+→ running
+```
+
+Restart keeps the same current task.
+
+Restart also stops an active expiration alarm.
+
+Keep restart semantics centralized in `FocusSession`, with elapsed-time mechanics delegated to `SessionClock`.
+
+---
+
+# 19. Timer Expiration
+
+When Timer reaches `00:00`:
+
+* remain at `00:00`,
+* mark Timer expired,
+* play an audible alarm,
+* keep the current task active,
+* do not clear the task,
+* do not start another Timer,
+* do not start a break,
+* do not implement Pomodoro.
+
+Expiration must work even when the menu popup is closed.
+
+Timer expiration state belongs to the current focus session, coordinated by `FocusSession`.
+
+Low-level elapsed-time mechanics still belong to `SessionClock`.
+
+---
+
+# 20. AlarmSoundService
+
+`AlarmSoundService` has one narrow responsibility:
+
+* start alarm playback,
+* stop alarm playback.
+
+Use native Apple/macOS APIs where reasonable.
+
+Do not add third-party audio dependencies.
+
+The alarm should repeat until stopped.
+
+Restart must:
+
+* stop alarm,
+* restore the configured Timer duration,
+* begin counting down again.
+
+Done/Clear must also stop the alarm.
+
+Do not put audio implementation in `MenuView`, `FocusSession`, or `SessionClock`.
+
+`FocusSession` may coordinate with `AlarmSoundService`, but the service owns the direct audio behavior.
+
+---
+
+# 21. Renaming a Task
+
+Renaming changes the description of the current task.
+
+It does **not** create a new task session.
+
+Most importantly:
+
+> **Renaming a task must not reset timing state.**
 
 Example:
 
 ```text
-Task:
-"Write README"
+Before:
+"Work on homework"
+Displayed time: 18:42
 
-Elapsed:
-31:14
+Rename to:
+"Finish ICS homework"
+
+After:
+"Finish ICS homework"
+Displayed time: 18:42
 ```
 
-After restart:
+Renaming should preserve:
 
-```text
-Task:
-"Write README"
+* `TimingMode`,
+* configured Timer duration,
+* elapsed/remaining displayed time,
+* running/paused state,
+* accumulated active elapsed duration,
+* current run/start timestamp,
+* Timer expiration state,
+* alarm playback state.
 
-Elapsed:
-00:00
-```
-
-The task itself remains active.
-
-Whether the timer was previously running or paused, restart should produce a fresh running timer beginning at zero.
-
-Keep restart logic centralized in `FocusSession`.
+Do not implement rename by clearing the task and creating a new one.
 
 ---
 
-# 18. Quit Semantics
+# 22. Completing / Clearing a Task
+
+For the MVP, marking the task as done and clearing the current task lead to the same resulting focus state:
+
+```text
+No Current Task
+```
+
+Clearing/completing should reset:
+
+* task,
+* `TimingMode`,
+* configured Timer duration,
+* `SessionClock`,
+* expiration state,
+* alarm playback,
+* menu bar task text.
+
+After clearing:
+
+```text
+currentTask = none
+TimingMode = default Stopwatch for the next task entry
+SessionClock = inactive
+expirationState = not expired
+alarmPlayback = stopped
+```
+
+Do not retain a task history in the MVP.
+
+---
+
+# 23. Quit Semantics
 
 Quitting OnTask intentionally ends the current application session.
 
-Because current task and stopwatch state are not persisted, quitting while a task exists would destroy that focus session.
+Because current task and timing state are not persisted, quitting while a task exists would destroy that focus session.
 
 Therefore Quit has two behaviors.
 
-## 18.1 Quit With No Current Task
+## 23.1 Quit With No Current Task
 
 If no current task exists:
 
@@ -531,9 +745,9 @@ OnTask quits immediately
 
 No confirmation is necessary.
 
-## 18.2 Quit With an Active Task
+## 23.2 Quit With an Active Task
 
-If a current task exists, whether its stopwatch is running or paused:
+If a current task exists, whether its Stopwatch or Timer is running, paused, or expired:
 
 ```text
 User selects Quit
@@ -541,7 +755,7 @@ User selects Quit
 Confirmation required
 ```
 
-The user must be clearly warned that quitting will lose the current task and timer state.
+The user must be clearly warned that quitting will lose the current task and timing state.
 
 Conceptually:
 
@@ -549,8 +763,8 @@ Conceptually:
 ┌────────────────────────────────────────┐
 │ Quit OnTask?                           │
 │                                        │
-│ Your current task and timer will be    │
-│ cleared when OnTask quits.             │
+│ Your current task and timing state     │
+│ will be cleared when OnTask quits.     │
 │                                        │
 │          Cancel        Quit            │
 └────────────────────────────────────────┘
@@ -564,8 +778,11 @@ If the user chooses Cancel:
 
 * do not quit,
 * preserve the task,
-* preserve timer state,
-* continue the existing focus session.
+* preserve `TimingMode`,
+* preserve configured Timer duration,
+* preserve `SessionClock`,
+* preserve expiration state,
+* preserve alarm playback state.
 
 ### Confirm Quit
 
@@ -579,9 +796,20 @@ A later application launch begins with a new empty session.
 
 ---
 
-# 19. No Persistence in the MVP
+# 24. No Persistence in the MVP
 
 The MVP intentionally does **not** persist the active focus session.
+
+Do not persist:
+
+* task,
+* timing mode,
+* Timer duration,
+* elapsed time,
+* remaining time,
+* paused/running state,
+* expiration state,
+* alarm playback state.
 
 Do not add:
 
@@ -593,15 +821,24 @@ Do not add:
 * cloud storage,
 * remote databases,
 
-for the current task or timer.
+for the current task or timing state.
 
-Task and timer information should exist only in application memory while OnTask is running.
+Task and timing information should exist only in application memory while OnTask is running.
 
 This is a deliberate product decision, not a missing feature.
 
+Fresh launch means:
+
+```text
+currentTask = none
+TimingMode = default Stopwatch for task entry
+SessionClock = inactive
+expirationState = not expired
+```
+
 ---
 
-# 20. Architecture Overview
+# 25. Architecture Overview
 
 The MVP architecture is:
 
@@ -614,16 +851,24 @@ The MVP architecture is:
                     │    (Model)     │
                     └───────┬────────┘
                          ▲   │
-                         │   │
-             reads state │   │ state changes
-          invokes actions│   │
+                         │   │ owns/coordinates
                          │   ▼
-                    ┌────┴─────┐
-                    │ MenuView │
-                    │  (View)  │
-                    └────┬─────┘
-                         ↕
-                        User
+                    ┌────────────────┐
+                    │   TimingMode   │
+                    │    (Model)     │
+                    └────────────────┘
+                         │
+                         ▼
+                    ┌────────────────┐
+                    │  SessionClock  │
+                    │    (Model)     │
+                    └────────────────┘
+                         │
+                         ▼
+                    ┌────────────────────┐
+                    │ AlarmSoundService  │
+                    │     (Model)      │
+                    └────────────────────┘
 ```
 
 The primary runtime interaction loop is:
@@ -649,11 +894,25 @@ User
 * provides that session to `MenuView`,
 * handles top-level application wiring.
 
+`FocusSession` remains the single source of truth for the current focus session.
+
+Conceptually:
+
+```text
+FocusSession
+├── current task
+├── TimingMode
+│   ├── Stopwatch
+│   └── Timer(duration)
+└── SessionClock
+    └── active elapsed time
+```
+
 There is no persistence layer in the MVP.
 
 ---
 
-# 21. Repository / Source Structure
+# 26. Repository / Source Structure
 
 The intended MVP source structure is:
 
@@ -661,13 +920,16 @@ The intended MVP source structure is:
 OnTask/
 ├── Views/
 │   └── MenuView.swift
-│
 ├── Models/
-│   └── FocusSession.swift
-│
+│   ├── FocusSession.swift
+│   ├── TimingMode.swift
+│   └── SessionClock.swift
+│   └── AlarmSoundService.swift
 ├── OnTaskApp.swift
 └── Assets.xcassets/
 ```
+
+If the actual repository is temporarily flatter during incremental development, do not move files unnecessarily.
 
 Do not add folders merely because they might theoretically be useful someday.
 
@@ -675,7 +937,7 @@ Add new files or directories only when they have an actual responsibility.
 
 ---
 
-# 22. File Responsibilities
+# 27. File Responsibilities
 
 ## `OnTaskApp.swift`
 
@@ -692,9 +954,7 @@ Keep this file small.
 
 It should primarily wire components together.
 
-Do not place stopwatch algorithms or task business logic here.
-
----
+Do not place timing algorithms, task business logic, or alarm audio implementation here.
 
 ## `Views/MenuView.swift`
 
@@ -703,21 +963,23 @@ The primary/root UI for the MVP.
 Responsibilities include displaying:
 
 * task input when no task exists,
+* Stopwatch/Timer selector,
+* Timer minutes field when Timer is selected,
 * current task,
-* elapsed stopwatch time,
-* timer controls,
+* displayed Stopwatch elapsed time or Timer remaining time,
+* timing controls,
 * rename controls,
 * done/clear controls,
 * quit control,
 * quit confirmation UI when appropriate.
 
-`MenuView` may detect user actions and invoke model behavior.
+`MenuView` may collect user input and invoke model behavior.
 
 It should not own underlying focus-session rules.
 
-Do not duplicate timer calculations here if they belong in `FocusSession`.
+Do not duplicate timing calculations here if they belong in `FocusSession`, `TimingMode`, or `SessionClock`.
 
----
+Do not play looping alarm audio directly from `MenuView`.
 
 ## `Models/FocusSession.swift`
 
@@ -726,18 +988,17 @@ The primary model and single source of truth for the current focus session.
 Responsibilities include state and behavior related to:
 
 * current task,
-* active/inactive task state,
-* timer running/paused state,
-* accumulated duration,
-* task start/resume timestamps,
-* start,
-* pause,
-* resume,
-* restart,
+* selected `TimingMode`,
+* configured Timer duration,
+* the current `SessionClock`,
+* timer expiration state,
+* starting a session,
+* pause/resume/restart semantics,
 * rename,
-* clear/complete.
+* clear/complete,
+* coordination with alarm behavior.
 
-This model owns the meaning of focus-session actions.
+`FocusSession` should use `SessionClock` rather than duplicating timestamp and elapsed-time algorithms.
 
 Example:
 
@@ -748,14 +1009,54 @@ MenuView receives click
         ↓
 FocusSession.pause()
         ↓
-FocusSession calculates and updates state
+SessionClock records accumulated active elapsed time
+        ↓
+FocusSession publishes updated state
         ↓
 MenuView reflects the updated state
 ```
 
 Do not make `MenuView` independently implement pause logic.
 
----
+## `Models/TimingMode.swift`
+
+Describes whether the current focus session uses Stopwatch or Timer behavior.
+
+Responsibilities include:
+
+* representing Stopwatch mode,
+* representing Timer mode with a configured duration,
+* interpreting `SessionClock` active elapsed time for display.
+
+It should not own task text, run timestamps, pause/resume state, or alarm playback.
+
+## `Models/SessionClock.swift`
+
+Owns reusable active-time mechanics.
+
+Responsibilities include:
+
+* start timestamp,
+* accumulated active elapsed duration,
+* running/paused state,
+* start,
+* pause,
+* resume,
+* restart,
+* active elapsed-time calculation.
+
+It should not know whether elapsed time is displayed upward as Stopwatch time or downward as Timer remaining time.
+
+## `Models/AlarmSoundService.swift`
+
+Owns direct alarm playback behavior.
+
+Responsibilities include:
+
+* start repeating alarm playback,
+* stop alarm playback.
+
+It should not own task state, timing mode, elapsed-time math, or menu UI.
 
 ## `Assets.xcassets/`
 
@@ -764,13 +1065,14 @@ Stores application visual assets such as:
 * app icon,
 * menu-bar icon,
 * colors,
-* images.
+* images,
+* alarm audio assets if native resource storage is needed.
 
 Do not place Swift source code in the asset catalog.
 
 ---
 
-# 23. Views vs Models
+# 28. Views vs Models vs Services
 
 Use these definitions consistently.
 
@@ -784,7 +1086,10 @@ Examples:
 
 * labels,
 * text fields,
-* buttons,
+* Stopwatch/Timer buttons,
+* minutes field,
+* displayed time,
+* controls,
 * menu sections,
 * formatting,
 * layout,
@@ -792,9 +1097,7 @@ Examples:
 
 Views may detect an event such as a click.
 
-Views should delegate the meaning of task/timer actions to the model.
-
----
+Views should delegate the meaning of task and timing actions to the model.
 
 ## Models
 
@@ -806,38 +1109,35 @@ Examples:
 
 ```text
 current task
-is the timer paused?
-when was the timer resumed?
-how much elapsed time has accumulated?
+selected TimingMode
+configured Timer duration
+active elapsed time
+is the clock paused?
+when was the clock resumed?
 what does restart mean?
 what happens when a task is cleared?
+has the Timer expired?
 ```
 
 Models own application state and state transitions.
 
----
+## Services
 
-# 24. Future Services
+Services answer:
 
-There is no `Services/` folder required for the current MVP.
+> **How does the app interact with a narrow operating-system or external facility?**
 
-If OnTask later needs to interact with operating-system facilities or external systems, a service layer may be introduced then.
-
-Possible future examples include:
+For the current Timer feature, the only intended service is:
 
 ```text
-NotificationService
-CalendarService
-LaunchAtLoginService
+AlarmSoundService
 ```
 
-Do not create these now.
-
-Do not create an empty `Services/` folder merely for future architecture.
+Do not introduce broad service layers or manager objects.
 
 ---
 
-# 25. Root UI Philosophy
+# 29. Root UI Philosophy
 
 `MenuView` is the root/master UI container.
 
@@ -873,7 +1173,7 @@ Do not build those future modules until explicitly requested.
 
 ---
 
-# 26. No Master Model for the MVP
+# 30. No Master Model for the MVP
 
 Do not introduce a generic:
 
@@ -913,7 +1213,7 @@ Do not preemptively build it.
 
 ---
 
-# 27. Extensibility Philosophy
+# 31. Extensibility Philosophy
 
 The architecture should remain easy to extend without implementing extensions prematurely.
 
@@ -938,9 +1238,12 @@ Good:
 
 ```text
 MenuView ↔ FocusSession
+FocusSession → TimingMode
+FocusSession → SessionClock
+FocusSession → AlarmSoundService
 ```
 
-because the UI and focus logic have clear responsibilities.
+because the UI, focus-session rules, reusable clock mechanics, and alarm playback each have clear responsibilities.
 
 Bad:
 
@@ -948,7 +1251,9 @@ Bad:
 MenuView.swift
 
 contains UI
-contains timer algorithms
+contains timestamp algorithms
+contains countdown expiration rules
+contains looping audio implementation
 contains integrations
 contains system services
 contains everything
@@ -956,9 +1261,9 @@ contains everything
 
 ---
 
-# 28. Integration Philosophy
+# 32. Integration Philosophy
 
-If OnTask later communicates with external applications or services, that integration should generally not be embedded directly in `MenuView` or `FocusSession`.
+If OnTask later communicates with external applications or services, that integration should generally not be embedded directly in `MenuView`, `FocusSession`, `TimingMode`, or `SessionClock`.
 
 A future integration might conceptually look like:
 
@@ -967,28 +1272,39 @@ External Service
       ↓
 Integration / Service
       ↓
-Application Model
+Application Model or FocusSession coordination
       ↓
 View
 ```
 
 Do not implement integrations unless explicitly requested.
 
+`AlarmSoundService` is allowed because Timer expiration creates a narrow native audio responsibility.
+
 ---
 
-# 29. Pomodoro Extensibility
+# 33. Pomodoro Extensibility
 
 Do not add Pomodoro functionality in the MVP.
 
+Do not implement:
+
+* work/break cycles,
+* automatic breaks,
+* cycle counts,
+* Pomodoro settings,
+* Pomodoro history,
+* `PomodoroSession.swift`.
+
 If Pomodoro is added later, it should not require rewriting the core focus-session architecture.
 
-Keep current task logic sufficiently isolated that another timer-related feature can be introduced as its own model or service where appropriate.
+`SessionClock` should be reusable enough that a future Pomodoro feature could use the same active-time mechanics.
 
 Do not combine hypothetical Pomodoro behavior into `FocusSession` now.
 
 ---
 
-# 30. UI Design Principles
+# 34. UI Design Principles
 
 OnTask should feel:
 
@@ -1015,7 +1331,7 @@ Its own UI should therefore demand as little attention as reasonably possible.
 
 ---
 
-# 31. Menu-Bar Design Principles
+# 35. Menu-Bar Design Principles
 
 Menu-bar space is scarce.
 
@@ -1024,18 +1340,18 @@ Therefore:
 * keep labels short,
 * truncate long task names,
 * avoid displaying unnecessary status text,
-* do not permanently display elapsed time in the menu-bar label unless explicitly requested,
+* do not permanently display elapsed or remaining time in the menu-bar label unless explicitly requested,
 * avoid menu-bar UI that expands significantly.
 
 The menu bar's main job is:
 
 > **Keep the current task visible.**
 
-Detailed timer information belongs inside the menu.
+Detailed timing information belongs inside the menu.
 
 ---
 
-# 32. Native macOS First
+# 36. Native macOS First
 
 Prefer native Apple APIs and SwiftUI where reasonable.
 
@@ -1048,6 +1364,8 @@ macOS APIs
 ```
 
 Use AppKit only when necessary to accomplish behavior that SwiftUI does not cleanly provide.
+
+Use native Apple/macOS audio APIs for alarm playback where reasonable.
 
 Do not introduce:
 
@@ -1062,7 +1380,7 @@ for functionality that can be implemented cleanly with the native macOS stack.
 
 ---
 
-# 33. Dependencies
+# 37. Dependencies
 
 Prefer standard Apple frameworks.
 
@@ -1085,7 +1403,7 @@ For the MVP, the expected third-party dependency count is:
 
 ---
 
-# 34. State Ownership Rule
+# 38. State Ownership Rule
 
 One of the most important architectural rules:
 
@@ -1107,13 +1425,17 @@ Prefer:
 
 ```text
 FocusSession.currentTask
+FocusSession.timingMode
+FocusSession.sessionClock
 ```
 
 with other components reading or presenting that state.
 
+`SessionClock` may own reusable clock mechanics, but it is part of the focus-session model graph coordinated by `FocusSession`.
+
 ---
 
-# 35. Keep Views Thin
+# 39. Keep Views Thin
 
 A view may:
 
@@ -1126,15 +1448,17 @@ A view may:
 A view should generally not:
 
 * calculate session semantics,
-* implement timer state machines,
+* implement active-time algorithms,
+* independently calculate countdown expiration,
 * decide how restart works,
-* decide how pause accumulation works.
+* decide how pause accumulation works,
+* play looping alarm audio directly.
 
 If logic becomes difficult to describe as purely UI behavior, it likely belongs elsewhere.
 
 ---
 
-# 36. Keep Models Focused
+# 40. Keep Models Focused
 
 `FocusSession` should represent focus-session behavior.
 
@@ -1147,13 +1471,14 @@ It should not eventually become responsible for:
 * arbitrary integrations,
 * unrelated settings,
 * menu layout,
-* app icons.
+* app icons,
+* direct audio playback implementation.
 
 When a responsibility is genuinely different, introduce an appropriate component when there is an actual requirement.
 
----
+For Timer expiration alarm playback, that component is `AlarmSoundService`.
 
-# 37. Quit Confirmation Responsibility
+# 41. Quit Confirmation Responsibility
 
 The decision about whether quitting would destroy an active session depends on focus-session state.
 
@@ -1175,11 +1500,15 @@ If yes:
 Ask for confirmation
 ```
 
-Quit confirmation is a UI responsibility. If a current task exists, show a confirmation dialog before terminating the app. Do not save or restore the session as part of this flow; the confirmation exists only to prevent accidental loss of the current in-memory task and timer.
+Quit confirmation is a UI responsibility.
+
+If a current task exists, show a confirmation dialog before terminating the app.
+
+Do not save or restore the session as part of this flow; the confirmation exists only to prevent accidental loss of the current in-memory task and timing state.
 
 ---
 
-# 38. Error Handling Philosophy
+# 42. Error Handling Philosophy
 
 This is a small local application.
 
@@ -1195,9 +1524,13 @@ Important failures should:
 
 Do not introduce large error-management frameworks for the MVP.
 
+Timer input validation should stay simple and user-facing.
+
+Alarm playback failure should not corrupt task or timing state.
+
 ---
 
-# 39. Naming
+# 43. Naming
 
 Prefer descriptive names.
 
@@ -1205,8 +1538,11 @@ Good examples:
 
 ```text
 FocusSession
-MenuView
+TimingMode
+SessionClock
+AlarmSoundService
 elapsedTime
+remainingTime
 isPaused
 resume()
 restart()
@@ -1232,7 +1568,7 @@ Use Swift naming conventions.
 
 ---
 
-# 40. Code Readability
+# 44. Code Readability
 
 Optimize for code that a developer relatively new to Swift can follow.
 
@@ -1250,20 +1586,20 @@ Do not compress understandable logic into difficult one-liners merely to reduce 
 
 ---
 
-# 41. Comments
+# 45. Comments
 
 Comments should explain **why**, especially when behavior is not obvious.
 
 Good:
 
-```text
+```swift
 // Store accumulated elapsed time when pausing so wall-clock time
 // during the paused period does not count toward the session.
 ```
 
 Less useful:
 
-```text
+```swift
 // Set isPaused to true
 isPaused = true
 ```
@@ -1272,7 +1608,7 @@ Do not over-comment self-explanatory Swift syntax.
 
 ---
 
-# 42. Incremental Development Rule
+# 46. Incremental Development Rule
 
 This repository should be developed incrementally.
 
@@ -1284,11 +1620,11 @@ Do not automatically continue into later milestones.
 
 For example, if asked:
 
-> Add quit confirmation for active tasks.
+> Add `TimingMode`.
 
 Do not also implement:
 
-* notifications,
+* alarm audio,
 * Pomodoro,
 * integrations,
 * storage,
@@ -1298,7 +1634,7 @@ Small commits and understandable milestones are preferred.
 
 ---
 
-# 43. Before Editing
+# 47. Before Editing
 
 Before making meaningful changes:
 
@@ -1314,7 +1650,7 @@ The repository is the current source of truth for implementation state.
 
 ---
 
-# 44. Existing Code First
+# 48. Existing Code First
 
 Before creating a new abstraction:
 
@@ -1322,22 +1658,31 @@ Before creating a new abstraction:
 * extend existing responsibilities when appropriate,
 * avoid duplicate implementations.
 
-Do not create:
+Do not create multiple objects representing the same concept, such as:
 
 ```text
-FocusTimer
+StopwatchManager
 TimerManager
-TimerService
+TimerFactory
+ClockStrategyFactory
 SessionTimer
 ```
 
-all representing the same concept.
-
 Keep the architecture coherent.
+
+The intended timing refactor is limited to:
+
+```text
+TimingMode
+SessionClock
+AlarmSoundService
+```
+
+Do not introduce a master model above `FocusSession`.
 
 ---
 
-# 45. Changes to Project Structure
+# 49. Changes to Project Structure
 
 Do not reorganize the project casually.
 
@@ -1346,6 +1691,7 @@ The intended MVP baseline is:
 ```text
 Views/
 Models/
+Services/
 ```
 
 plus:
@@ -1363,7 +1709,7 @@ When moving Swift files, preserve Xcode project references and ensure the projec
 
 ---
 
-# 46. Build Validation
+# 50. Build Validation
 
 After implementation changes, build the app.
 
@@ -1395,9 +1741,11 @@ If repository configuration differs, inspect the project rather than blindly ass
 
 Fix compilation errors introduced by the change before considering the task complete.
 
+Documentation-only changes do not require a build unless the prompt explicitly asks for one.
+
 ---
 
-# 47. Runtime Validation
+# 12. Runtime Validation
 
 For UI behavior, compilation alone is insufficient.
 
@@ -1409,13 +1757,30 @@ Examples:
 * no-task state displays correctly,
 * task can be entered,
 * task label updates,
-* pause stops elapsed-time growth,
-* resume continues from prior duration,
-* restart resets duration,
-* rename preserves duration,
+* Stopwatch is selected by default,
+* Timer reveals minutes input,
+* Stopwatch hides minutes input,
+* invalid Timer input is rejected,
+* Stopwatch starts at `00:00`,
+* Stopwatch counts up,
+* Timer starts at configured duration,
+* Timer counts down,
+* pause freezes Stopwatch elapsed time,
+* pause freezes Timer remaining time,
+* resume continues from prior active elapsed time,
+* restart resets Stopwatch display to `00:00`,
+* restart restores Timer to original configured duration,
+* Timer stops at `00:00`,
+* Timer never goes negative,
+* alarm plays on Timer expiration,
+* expiration works with popup closed,
+* restart stops alarm,
+* Done/Clear stops alarm,
+* rename preserves timing state,
 * clear returns to icon-only state,
 * Quit with no task exits immediately,
-* Quit with an active task requires confirmation,
+* Quit with an active Stopwatch requires confirmation,
+* Quit with running, paused, or expired Timer requires confirmation,
 * Cancel on the quit confirmation preserves the session,
 * confirmed Quit removes the menu-bar presence,
 * relaunch starts with an empty focus session.
@@ -1424,33 +1789,39 @@ Only validate behavior relevant to the current implementation stage.
 
 ---
 
-# 48. Testing Philosophy
+# 52. Testing Philosophy
 
-Prefer tests for behavior with meaningful logic, especially timer state transitions.
+Prefer tests for behavior with meaningful logic, especially timing state transitions.
 
 Potential model-level scenarios include:
 
 ```text
-start → running
+start Stopwatch → running
+start Timer with valid duration → running
+start Timer with invalid duration → rejected
 running → pause
 pause → resume
-running → restart
-paused → restart
-rename preserves elapsed time
-clear removes task and resets timer
+running Stopwatch → restart
+running Timer → restart
+paused Timer → restart
+Timer elapsed calculation clamps remaining time at 00:00
+Timer expiration state is set once remaining time reaches 00:00
+rename preserves TimingMode and SessionClock state
+clear removes task and resets timing state
+Done/Clear stops alarm coordination
 ```
 
 Do not create excessive testing infrastructure before there is meaningful logic to test.
 
-Timer logic should be structured so it can be tested without requiring the actual UI.
+Timing logic should be structured so it can be tested without requiring the actual UI.
 
-Where useful, avoid hard dependencies on `Date.now` throughout business logic if doing so makes deterministic timer tests difficult.
+Where useful, avoid hard dependencies on `Date.now` throughout business logic if doing so makes deterministic timing tests difficult.
 
 Do not overengineer testability prematurely, but keep deterministic logic in mind.
 
 ---
 
-# 49. Source Control
+# 53. Source Control
 
 Do not remove or rewrite repository-level project files without need.
 
@@ -1476,11 +1847,11 @@ Do not commit:
 
 ---
 
-# 50. Privacy
+# 54. Privacy
 
 OnTask's MVP is local and session-based.
 
-Task text and timer state exist only inside the running application process.
+Task text and timing state exist only inside the running application process.
 
 Do not:
 
@@ -1496,7 +1867,7 @@ No user account is required.
 
 ---
 
-# 51. Security
+# 55. Security
 
 The MVP handles low-risk local productivity data.
 
@@ -1509,9 +1880,11 @@ Still follow basic safety principles:
 
 Use the minimum system privileges required.
 
+Alarm playback should use normal local audio capabilities and should not require extra permissions beyond what native playback requires.
+
 ---
 
-# 52. Performance
+# 56. Performance
 
 OnTask should be lightweight.
 
@@ -1524,11 +1897,13 @@ Avoid:
 * unnecessary networking,
 * unnecessary CPU work.
 
-A visible stopwatch may refresh frequently enough for a natural display, but the underlying architecture should remain efficient.
+A visible Stopwatch or Timer may refresh frequently enough for a natural display, but the underlying architecture should remain efficient.
+
+Timer expiration must still work when the menu popup is closed, so any background timing check should be proportional and lightweight.
 
 ---
 
-# 53. Accessibility
+# 57. Accessibility
 
 Use standard SwiftUI controls where possible.
 
@@ -1538,15 +1913,21 @@ Buttons and icons should have understandable labels where appropriate.
 
 The application should remain usable without relying solely on ambiguous iconography.
 
+The Stopwatch/Timer selector should be understandable to VoiceOver users.
+
+The Timer minutes field should have a clear label.
+
 Confirmation dialogs should clearly identify the destructive action.
 
 ---
 
-# 54. Avoid Premature Features
+# 58. Avoid Premature Features
 
 Do not independently add:
 
 * Pomodoro,
+* work/break cycles,
+* automatic breaks,
 * task history,
 * productivity scores,
 * analytics,
@@ -1571,7 +1952,7 @@ Even if such a feature seems useful, it is outside the current MVP unless explic
 
 ---
 
-# 55. Avoid Premature Infrastructure
+# 59. Avoid Premature Infrastructure
 
 Do not independently introduce:
 
@@ -1595,16 +1976,18 @@ The current architecture does not require them.
 
 Introduce infrastructure only when an actual requirement creates the need.
 
+`SessionClock`, `TimingMode`, and `AlarmSoundService` are narrow product-driven abstractions for the Timer feature, not permission to create broad infrastructure.
+
 ---
 
-# 56. Do Not One-Shot the Project
+# 60. Do Not One-Shot the Project
 
 Even though the overall MVP is documented here, do not interpret this document as an instruction to implement everything at once.
 
 If the current prompt asks only for:
 
 ```text
-quit confirmation
+Refactor Stopwatch logic into SessionClock
 ```
 
 implement only that.
@@ -1612,7 +1995,7 @@ implement only that.
 If a later prompt asks for:
 
 ```text
-UI polish
+Add Timer expiration alarm
 ```
 
 implement that separately.
@@ -1621,7 +2004,7 @@ The purpose of this document is to ensure each incremental change fits the same 
 
 ---
 
-# 57. Current MVP Development Status
+# 61. Current MVP Development Status
 
 The following core behaviors have already been implemented or are considered part of the established MVP design:
 
@@ -1631,21 +2014,51 @@ The following core behaviors have already been implemented or are considered par
 3. FocusSession task state
 4. Set / display current task
 5. Clear / complete current task
-6. Running stopwatch
+6. Stopwatch timing
 7. Pause / resume
 8. Restart
 9. Rename
+10. Stopwatch visibility control
 ```
 
 Do not reimplement working functionality unnecessarily.
 
-Remaining work should be performed incrementally based on explicit prompts.
+The following Timer-related work is upcoming and should not be marked as implemented until confirmed in the repository:
+
+```text
+1. Stopwatch vs Timer selector
+2. Countdown Timer
+3. TimingMode
+4. SessionClock refactor
+5. Timer expiration handling
+6. AlarmSoundService
+```
 
 No persistence milestone exists in the current MVP.
 
 ---
 
-# 58. Architecture Decision Rule
+# 62. Incremental Timer Development Path
+
+Timer-related work should be implemented in small, reviewable steps.
+
+A reasonable order is:
+
+1. Refactor existing Stopwatch logic into `SessionClock` without behavior changes.
+2. Add `TimingMode`.
+3. Add Stopwatch/Timer selection UI.
+4. Add countdown Timer behavior.
+5. Add expiration detection.
+6. Add `AlarmSoundService`.
+7. Test and polish.
+
+Do **not** implement these steps merely because they are documented here.
+
+Only implement the step explicitly requested by the current prompt.
+
+---
+
+# 63. Architecture Decision Rule
 
 When unsure where code belongs, ask:
 
@@ -1657,7 +2070,7 @@ Put it in:
 Views/
 ```
 
-### Is this about task/timer state or behavior?
+### Is this about task/timing state or focus-session behavior?
 
 Put it in:
 
@@ -1665,134 +2078,134 @@ Put it in:
 Models/
 ```
 
-### Is this about application startup and top-level wiring?
+### Is this about narrow interaction with macOS or external facilities?
 
-It likely belongs in:
-
-```text
-OnTaskApp.swift
-```
-
-### Is this interaction with a future external system or macOS service?
-
-Only then consider introducing:
+Put it in:
 
 ```text
 Services/
 ```
 
-Do not create the layer before it is needed.
+### Is this about application startup and top-level wiring?
 
----
-
-# 59. Example Event Flow: Pause
+Put it in:
 
 ```text
-User
-  ↓
-Pause button
-  ↓
-MenuView
-  ↓
-FocusSession.pause()
-  ↓
-FocusSession updates elapsed state
-  ↓
-SwiftUI reflects new state in MenuView
-  ↓
-User continues interacting
+OnTaskApp.swift
 ```
 
-The same general pattern applies to:
+Examples:
 
 ```text
-start
-resume
-restart
-rename
-clear
+Menu layout                       → MenuView
+Stopwatch/Timer selector UI       → MenuView
+Timer minutes text field          → MenuView
+Current task text                 → FocusSession
+TimingMode                        → TimingMode
+Elapsed active-time calculation   → SessionClock
+Countdown remaining-time display  → TimingMode / FocusSession coordination
+Timer expiration state            → FocusSession
+Alarm audio playback              → AlarmSoundService
+Menu-bar label wiring             → OnTaskApp
 ```
 
 ---
 
-# 60. Example Event Flow: Quit
+# 64. Example Event Flow: Pause
 
-## No Active Task
-
-```text
-User
-  ↓
-Quit
-  ↓
-No active task
-  ↓
-Terminate OnTask
-```
-
-## Active Task
+A correct pause flow looks like:
 
 ```text
-User
-  ↓
-Quit
-  ↓
-Active task exists
-  ↓
-Show confirmation
-  ↓
-         ┌─────────────┴─────────────┐
-         ▼                           ▼
-      Cancel                    Confirm Quit
-         │                           │
-         ▼                           ▼
-Keep FocusSession              Terminate app
-unchanged                      and discard session
+User clicks Pause
+      ↓
+MenuView invokes FocusSession.pause()
+      ↓
+FocusSession delegates active-time mechanics to SessionClock
+      ↓
+SessionClock stores accumulated active elapsed time
+      ↓
+FocusSession publishes updated state
+      ↓
+MenuView reflects paused state
 ```
+
+`MenuView` should not calculate what pause means.
 
 ---
 
-# 61. Central Engineering Principle
+# 65. Example Event Flow: Timer Expiration
 
-The central architecture principle for OnTask is:
-
-> **The UI presents state. The model owns behavior. The app entry point starts and connects everything.**
-
-More concretely:
+A correct Timer expiration flow looks like:
 
 ```text
-MenuView
-= what the user sees and interacts with
-
-FocusSession
-= what the app knows and how focus behavior works
-
-OnTaskApp
-= how everything starts and connects
+SessionClock reports active elapsed time
+      ↓
+FocusSession interprets elapsed time through TimingMode.timer(duration)
+      ↓
+remainingTime reaches 00:00
+      ↓
+FocusSession marks Timer expired
+      ↓
+FocusSession coordinates AlarmSoundService.startAlarm()
+      ↓
+MenuView reflects expired Timer when opened
 ```
 
-The main runtime relationship is:
+Expiration should not require the menu popup to be open.
 
-```text
-User ↔ MenuView ↔ FocusSession
-```
-
-Maintain this separation unless a concrete requirement demonstrates that another design would be simpler or clearer.
+Expiration should not clear the task or start Pomodoro behavior.
 
 ---
 
-# 62. Definition of a Good Change
+# 66. Example Event Flow: Quit
 
-A good OnTask change should:
+A correct quit flow looks like:
 
-* solve the requested behavior,
-* preserve the product's simplicity,
-* fit the established architecture,
-* avoid unrelated modifications,
-* compile successfully,
-* remain understandable,
-* avoid unnecessary dependencies,
-* make future modification reasonably easy,
-* not implement unrequested features.
+```text
+User clicks Quit
+      ↓
+MenuView checks whether FocusSession has a current task
+      ↓
+No task: terminate immediately
+Task exists: show confirmation
+      ↓
+Cancel: preserve FocusSession unchanged
+Confirm: terminate application
+```
 
-When there is a choice, prefer the smallest clean solution that satisfies the current requirement.
+Quit confirmation is temporary UI state, not focus-session state.
 
+---
+
+# 67. Central Engineering Principle
+
+The central rule for OnTask is:
+
+> **Keep the app small, native, and focused on one current task.**
+
+That means:
+
+* one current task,
+* one `FocusSession`,
+* one selected `TimingMode` per session,
+* one reusable `SessionClock` for active-time mechanics,
+* one narrow `AlarmSoundService` for alarm playback,
+* no task lists,
+* no persistence,
+* no Pomodoro until explicitly requested,
+* no broad infrastructure without a concrete requirement.
+
+---
+
+# 68. Definition of a Good Change
+
+A good change in this repository:
+
+* implements only the requested increment,
+* keeps state ownership clear,
+* preserves existing behavior unless intentionally changed,
+* uses native macOS/SwiftUI APIs where practical,
+* avoids third-party dependencies,
+* avoids persistence unless explicitly requested,
+* leaves the app lightweight and easy to understand,
+* builds successfully when code changes are made.

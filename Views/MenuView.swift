@@ -39,6 +39,8 @@ struct MenuView: View {
     let focusSession: FocusSession
 
     @State private var taskText = ""
+    @State private var selectedTimingOption = StartTimingOption.stopwatch
+    @State private var timerMinutesText = "\(TimingMode.defaultTimerMinutes)"
     @State private var isRenamingTask = false
     @State private var renameText = ""
 
@@ -55,7 +57,7 @@ struct MenuView: View {
                 Divider()
                     .opacity(0.45)
 
-                stopwatchVisibilityToggle
+                timeVisibilityToggle
             }
 
             Divider()
@@ -83,11 +85,68 @@ struct MenuView: View {
                 .frame(maxWidth: .infinity)
                 .onSubmit(startTask)
 
+            timingModePicker
+
+            if selectedTimingOption == .timer {
+                timerDurationInput
+            }
+
             Button("Start Task", action: startTask)
                 .buttonStyle(OutlineButtonStyle(isPrimary: true))
-                .disabled(taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(!canStartTask)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // Shows Stopwatch and Timer start options.
+    private var timingModePicker: some View {
+        Picker("Timing mode", selection: $selectedTimingOption) {
+            ForEach(StartTimingOption.allCases) { option in
+                Text(option.title)
+                    .tag(option)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+    }
+
+    // Shows the Timer duration text input.
+    private var timerDurationInput: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("How many minutes?")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            TextField("25", text: $timerMinutesText)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit(startTask)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // Reports whether current start input is valid.
+    private var canStartTask: Bool {
+        let hasTaskText = !taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+        guard hasTaskText else {
+            return false
+        }
+
+        if selectedTimingOption == .timer {
+            return selectedTimingMode != nil
+        }
+
+        return true
+    }
+
+    // Converts start selection into model timing mode.
+    private var selectedTimingMode: TimingMode? {
+        switch selectedTimingOption {
+        case .stopwatch:
+            return .stopwatch
+        case .timer:
+            return TimingMode.timer(minutesText: timerMinutesText)
+        }
     }
 
     // Chooses active display or rename editor.
@@ -101,7 +160,7 @@ struct MenuView: View {
         }
     }
 
-    // Displays task, timer, and session controls.
+    // Displays task, time, and session controls.
     private func activeTaskView(_ currentTask: String) -> some View {
         VStack(spacing: 8) {
             Text(currentTask)
@@ -109,18 +168,20 @@ struct MenuView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
-            stopwatchDisplay
+            timeDisplay
 
-            if focusSession.isStopwatchRunning {
+            if focusSession.isTimerExpired {
+                timerExpiredLabel
+            } else if focusSession.isTimingRunning {
                 Button {
-                    focusSession.pauseStopwatch()
+                    focusSession.pauseTiming()
                 } label: {
                     Label("Pause", systemImage: "pause")
                 }
                 .buttonStyle(OutlineButtonStyle(isPrimary: true))
             } else {
                 Button {
-                    focusSession.resumeStopwatch()
+                    focusSession.resumeTiming()
                 } label: {
                     Label("Resume", systemImage: "play")
                 }
@@ -128,7 +189,7 @@ struct MenuView: View {
             }
 
             Button {
-                focusSession.restartStopwatch()
+                focusSession.restartTiming()
             } label: {
                 Label("Restart", systemImage: "arrow.clockwise")
             }
@@ -152,31 +213,39 @@ struct MenuView: View {
         .frame(maxWidth: .infinity)
     }
 
-    // Shows elapsed time or hidden indicator.
-    private var stopwatchDisplay: some View {
+    // Shows elapsed/remaining time or hidden indicator.
+    private var timeDisplay: some View {
         Group {
-            if focusSession.isStopwatchVisible {
-                Text(focusSession.elapsedTimeText)
+            if focusSession.isTimeVisible {
+                Text(focusSession.displayedTimeText)
                     .font(.system(size: 22, weight: .regular, design: .monospaced))
             } else {
                 Image(systemName: "eye.slash")
                     .font(.system(size: 15, weight: .regular))
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("Stopwatch hidden")
+                    .accessibilityLabel("Time hidden")
             }
         }
         .frame(height: 27)
     }
 
-    // Shows switch for stopwatch visibility.
-    private var stopwatchVisibilityToggle: some View {
+    // Shows Timer expiration status.
+    private var timerExpiredLabel: some View {
+        Label("Timer complete", systemImage: "bell")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+    }
+
+    // Shows switch for time visibility.
+    private var timeVisibilityToggle: some View {
         HStack {
-            Text("Show stopwatch")
+            Text("Show time")
                 .font(.system(size: 15, weight: .regular))
 
             Spacer()
 
-            Toggle("", isOn: stopwatchVisibilityBinding)
+            Toggle("", isOn: timeVisibilityBinding)
                 .toggleStyle(.switch)
                 .labelsHidden()
                 .scaleEffect(0.9)
@@ -187,17 +256,17 @@ struct MenuView: View {
     }
 
     // Bridges toggle changes to FocusSession behavior.
-    private var stopwatchVisibilityBinding: Binding<Bool> {
+    private var timeVisibilityBinding: Binding<Bool> {
         Binding(
             get: {
-                focusSession.isStopwatchVisible
+                focusSession.isTimeVisible
             },
             set: { isVisible in
-                guard focusSession.isStopwatchVisible != isVisible else {
+                guard focusSession.isTimeVisible != isVisible else {
                     return
                 }
 
-                focusSession.toggleStopwatchVisibility()
+                focusSession.toggleTimeVisibility()
             }
         )
     }
@@ -226,11 +295,17 @@ struct MenuView: View {
 
     // Starts a validated task through FocusSession.
     private func startTask() {
-        guard focusSession.startTask(taskText) else {
+        guard let selectedTimingMode else {
+            return
+        }
+
+        guard focusSession.startTask(taskText, timingMode: selectedTimingMode) else {
             return
         }
 
         taskText = ""
+        selectedTimingOption = .stopwatch
+        timerMinutesText = "\(TimingMode.defaultTimerMinutes)"
     }
 
     // Enters rename mode with current text.
@@ -263,7 +338,7 @@ struct MenuView: View {
 
         let alert = NSAlert()
         alert.messageText = "Quit OnTask?"
-        alert.informativeText = "Quitting will discard your current task and stopwatch state. This in-memory session cannot be restored."
+        alert.informativeText = "Quitting will discard your current task and timing state. This in-memory session cannot be restored."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Quit")
         alert.addButton(withTitle: "Cancel")
@@ -278,5 +353,27 @@ struct MenuView: View {
     // Terminates OnTask through the shared application.
     private func terminateApp() {
         NSApplication.shared.terminate(nil)
+    }
+}
+
+private extension MenuView {
+    enum StartTimingOption: String, CaseIterable, Identifiable {
+        case stopwatch
+        case timer
+
+        // Uses the raw value as stable identity.
+        var id: String {
+            rawValue
+        }
+
+        // Provides display text for the picker.
+        var title: String {
+            switch self {
+            case .stopwatch:
+                return "Stopwatch"
+            case .timer:
+                return "Timer"
+            }
+        }
     }
 }

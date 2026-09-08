@@ -13,13 +13,21 @@ final class FocusSession {
     private static let menuBarTaskCharacterLimit = 20
 
     private(set) var currentTask: String?
-    private(set) var elapsedTime: TimeInterval = 0
-    private(set) var isStopwatchRunning = false
-    private(set) var isStopwatchVisible = true
+    private(set) var timingMode: TimingMode = .stopwatch
+    private(set) var activeElapsedTime: TimeInterval = 0
+    private(set) var displayedTime: TimeInterval = 0
+    private(set) var isTimingRunning = false
+    private(set) var isTimeVisible = true
+    private(set) var isTimerExpired = false
 
-    @ObservationIgnored private var accumulatedElapsedTime: TimeInterval = 0
-    @ObservationIgnored private var currentRunStartedAt: Date?
-    @ObservationIgnored private var stopwatchTimer: Timer?
+    @ObservationIgnored private var sessionClock = SessionClock()
+    @ObservationIgnored private let alarmSoundService: AlarmSoundPlaying
+    @ObservationIgnored private var refreshTimer: Timer?
+
+    // Creates a focus session with alarm support.
+    init(alarmSoundService: AlarmSoundPlaying = AlarmSoundService()) {
+        self.alarmSoundService = alarmSoundService
+    }
 
     // Reports whether a task is currently active.
     var hasCurrentTask: Bool {
@@ -31,9 +39,24 @@ final class FocusSession {
         hasCurrentTask
     }
 
-    // Formats elapsed time for menu display.
+    // Preserves old running name for existing callers.
+    var isStopwatchRunning: Bool {
+        isTimingRunning
+    }
+
+    // Preserves old visibility name for existing callers.
+    var isStopwatchVisible: Bool {
+        isTimeVisible
+    }
+
+    // Formats visible time for menu display.
+    var displayedTimeText: String {
+        Self.formatTime(displayedTime)
+    }
+
+    // Preserves old display name for existing callers.
     var elapsedTimeText: String {
-        Self.formatElapsedTime(elapsedTime)
+        displayedTimeText
     }
 
     // Provides a shortened menu-bar task title.
@@ -50,56 +73,100 @@ final class FocusSession {
         return "\(truncatedText)..."
     }
 
-    // Validates and starts a new focus task.
+    // Validates and starts a Stopwatch task.
     @discardableResult
     func startTask(_ taskText: String) -> Bool {
+        startTask(taskText, timingMode: .stopwatch)
+    }
+
+    // Validates and starts a timed focus task.
+    @discardableResult
+    func startTask(_ taskText: String, timingMode: TimingMode, now: Date = Date()) -> Bool {
         let trimmedTask = taskText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !trimmedTask.isEmpty else {
             return false
         }
 
+        guard Self.isValidTimingMode(timingMode) else {
+            return false
+        }
+
+        stopRefreshTimer()
+        alarmSoundService.stopAlarm()
         currentTask = trimmedTask
-        startStopwatch()
+        self.timingMode = timingMode
+        isTimeVisible = true
+        isTimerExpired = false
+        sessionClock.start(now: now)
+        refreshTimingState(now: now)
+        startRefreshTimer()
         return true
     }
 
-    // Pauses timing and stores accumulated elapsed time.
-    func pauseStopwatch() {
-        guard isStopwatchRunning else {
+    // Pauses timing and stores active elapsed time.
+    func pauseTiming(now: Date = Date()) {
+        guard isTimingRunning else {
             return
         }
 
-        refreshElapsedTime()
-        accumulatedElapsedTime = elapsedTime
-        currentRunStartedAt = nil
-        isStopwatchRunning = false
+        sessionClock.pause(now: now)
+        refreshTimingState(now: now)
         stopRefreshTimer()
     }
 
-    // Resumes timing from accumulated elapsed time.
-    func resumeStopwatch() {
-        guard currentTask != nil, !isStopwatchRunning else {
+    // Preserves old pause name for existing callers.
+    func pauseStopwatch() {
+        pauseTiming()
+    }
+
+    // Resumes timing from accumulated active time.
+    func resumeTiming(now: Date = Date()) {
+        guard currentTask != nil, !isTimingRunning, !isTimerExpired else {
             return
         }
 
-        currentRunStartedAt = Date()
-        isStopwatchRunning = true
+        sessionClock.resume(now: now)
+        refreshTimingState(now: now)
         startRefreshTimer()
     }
 
+    // Preserves old resume name for existing callers.
+    func resumeStopwatch() {
+        resumeTiming()
+    }
+
     // Restarts timing for the current task.
-    func restartStopwatch() {
+    func restartTiming(now: Date = Date()) {
         guard currentTask != nil else {
             return
         }
 
-        startStopwatch()
+        alarmSoundService.stopAlarm()
+        isTimerExpired = false
+        sessionClock.restart(now: now)
+        refreshTimingState(now: now)
+        startRefreshTimer()
     }
 
-    // Toggles whether elapsed time is displayed.
+    // Preserves old restart name for existing callers.
+    func restartStopwatch() {
+        restartTiming()
+    }
+
+    // Recomputes timing for lifecycle and checks.
+    func refreshTiming(now: Date = Date()) {
+        refreshTimingState(now: now)
+    }
+
+    // Toggles whether displayed time is shown.
+    func toggleTimeVisibility() {
+        isTimeVisible.toggle()
+    }
+
+    // Preserves old visibility toggle name.
     func toggleStopwatchVisibility() {
-        isStopwatchVisible.toggle()
+        toggleTimeVisibility()
     }
 
     // Renames the task without changing timing.
@@ -119,65 +186,83 @@ final class FocusSession {
         return true
     }
 
-    // Clears the task and resets timer state.
+    // Clears the task and resets timing state.
     func completeCurrentTask() {
         currentTask = nil
-        resetStopwatch()
+        resetTiming()
     }
 
-    // Initializes a fresh running stopwatch state.
-    private func startStopwatch() {
+    // Clears all timing state to inactive.
+    private func resetTiming() {
         stopRefreshTimer()
-        accumulatedElapsedTime = 0
-        elapsedTime = 0
-        currentRunStartedAt = Date()
-        isStopwatchRunning = true
-        isStopwatchVisible = true
-        startRefreshTimer()
+        alarmSoundService.stopAlarm()
+        sessionClock.reset()
+        timingMode = .stopwatch
+        activeElapsedTime = 0
+        displayedTime = 0
+        isTimingRunning = false
+        isTimeVisible = true
+        isTimerExpired = false
     }
 
-    // Clears all stopwatch state to inactive.
-    private func resetStopwatch() {
-        stopRefreshTimer()
-        accumulatedElapsedTime = 0
-        elapsedTime = 0
-        currentRunStartedAt = nil
-        isStopwatchRunning = false
-        isStopwatchVisible = true
-    }
-
-    // Starts UI refresh ticks for elapsed time.
+    // Starts UI refresh ticks for displayed time.
     private func startRefreshTimer() {
         stopRefreshTimer()
 
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            self?.refreshElapsedTime()
+            self?.refreshTimingState()
         }
 
-        stopwatchTimer = timer
+        refreshTimer = timer
         RunLoop.main.add(timer, forMode: .common)
     }
 
-    // Stops any active elapsed-time refresh timer.
+    // Stops any active display refresh timer.
     private func stopRefreshTimer() {
-        stopwatchTimer?.invalidate()
-        stopwatchTimer = nil
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
 
-    // Recalculates elapsed time from timestamps.
-    private func refreshElapsedTime(now: Date = Date()) {
-        guard let currentRunStartedAt else {
-            elapsedTime = accumulatedElapsedTime
+    // Recalculates displayed time from clock state.
+    private func refreshTimingState(now: Date = Date()) {
+        activeElapsedTime = sessionClock.elapsedTime(now: now)
+        displayedTime = timingMode.displayedTime(activeElapsedTime: activeElapsedTime)
+        isTimingRunning = sessionClock.isRunning
+        handleTimerExpirationIfNeeded(now: now)
+    }
+
+    // Starts completion behavior once when Timer expires.
+    private func handleTimerExpirationIfNeeded(now: Date) {
+        guard case let .timer(duration) = timingMode else {
             return
         }
 
-        let currentRunElapsedTime = max(0, now.timeIntervalSince(currentRunStartedAt))
-        elapsedTime = accumulatedElapsedTime + currentRunElapsedTime
+        guard !isTimerExpired, activeElapsedTime >= duration else {
+            return
+        }
+
+        isTimerExpired = true
+        sessionClock.pause(now: now)
+        activeElapsedTime = sessionClock.elapsedTime(now: now)
+        displayedTime = 0
+        isTimingRunning = false
+        stopRefreshTimer()
+        alarmSoundService.startAlarm()
     }
 
-    // Converts elapsed seconds into display text.
-    private static func formatElapsedTime(_ elapsedTime: TimeInterval) -> String {
-        let totalSeconds = Int(elapsedTime)
+    // Validates supported focus-session timing modes.
+    private static func isValidTimingMode(_ timingMode: TimingMode) -> Bool {
+        switch timingMode {
+        case .stopwatch:
+            return true
+        case let .timer(duration):
+            return duration > 0
+        }
+    }
+
+    // Converts seconds into display text.
+    private static func formatTime(_ time: TimeInterval) -> String {
+        let totalSeconds = max(0, Int(time))
         let hours = totalSeconds / 3_600
         let minutes = (totalSeconds % 3_600) / 60
         let seconds = totalSeconds % 60
