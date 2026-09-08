@@ -109,44 +109,217 @@ struct MenuView: View {
         .pickerStyle(.segmented)
         .labelsHidden()
     }
+    
+    // Timer Duration
 
-    // Shows the Timer duration text input.
-    private var timerDurationInput: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("How many minutes?")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private enum TimerPreset: String, CaseIterable, Identifiable {
+        case fifteenMinutes
+        case thirtyMinutes
+        case fortyFiveMinutes
+        case oneHour
+        case custom
 
-            TextField("25", text: $timerMinutesText)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit(startTask)
+        var id: Self { self }
+
+        var title: String {
+            switch self {
+            case .fifteenMinutes:
+                return "15m"
+            case .thirtyMinutes:
+                return "30m"
+            case .fortyFiveMinutes:
+                return "45m"
+            case .oneHour:
+                return "1h"
+            case .custom:
+                return "Custom"
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+
+        var duration: TimeInterval? {
+            switch self {
+            case .fifteenMinutes:
+                return 15 * 60
+            case .thirtyMinutes:
+                return 30 * 60
+            case .fortyFiveMinutes:
+                return 45 * 60
+            case .oneHour:
+                return 60 * 60
+            case .custom:
+                return nil
+            }
+        }
     }
 
-    // Reports whether current start input is valid.
+    @State private var selectedTimerPreset: TimerPreset = .thirtyMinutes
+
+    @State private var customHours = 0
+    @State private var customMinutes = 0
+    @State private var customSeconds = 0
+
+
+    // Timer UI
+
+    private var timerDurationInput: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Duration")
+                .font(.headline)
+
+            // First row
+            HStack(spacing: 12) {
+                timerPresetButton(.fifteenMinutes)
+                timerPresetButton(.thirtyMinutes)
+                timerPresetButton(.fortyFiveMinutes)
+            }
+
+            // Second row
+            HStack(spacing: 12) {
+                timerPresetButton(.oneHour)
+                timerPresetButton(.custom)
+
+                Spacer()
+            }
+
+            // Only show custom controls when Custom is selected
+            if selectedTimerPreset == .custom {
+                customDurationPicker
+                    .padding(.top, 4)
+            }
+        }
+    }
+
+
+    // Preset Button
+    private func timerPresetButton(_ preset: TimerPreset) -> some View {
+        Button {
+            selectedTimerPreset = preset
+        } label: {
+            Text(preset.title)
+                .font(.system(size: 14))
+                .frame(minWidth: 25)
+                .padding(.horizontal, 15)
+                .padding(.vertical, 5)
+        }
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(
+                    selectedTimerPreset == preset
+                        ? Color.primary.opacity(0.10)
+                        : Color.clear
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(
+                    selectedTimerPreset == preset
+                        ? Color.primary.opacity(0.55)
+                        : Color.secondary.opacity(0.35),
+                    lineWidth: 1
+                )
+        )
+    }
+
+
+    private var customDurationPicker: some View {
+        HStack(spacing: 4) {
+            durationPickerColumn(
+                label: "hr",
+                selection: $customHours,
+                range: 0..<24
+            )
+
+            durationPickerColumn(
+                label: "min",
+                selection: $customMinutes,
+                range: 0..<60
+            )
+
+            durationPickerColumn(
+                label: "sec",
+                selection: $customSeconds,
+                range: 0..<60
+            )
+        }
+        .pickerStyle(.menu)
+    }
+
+    private func durationPickerColumn(
+        label: String,
+        selection: Binding<Int>,
+        range: Range<Int>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Picker("", selection: selection) {
+                ForEach(range, id: \.self) { value in
+                    Text("\(value)")
+                        .tag(value)
+                }
+            }
+            .labelsHidden()
+
+            Text(label)
+                .font(.system(size: 11, weight: .light))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 11)
+        }
+    }
+
+
+    // Selected Duration
+    private var selectedTimerDuration: TimeInterval? {
+        if let presetDuration = selectedTimerPreset.duration {
+            return presetDuration
+        }
+
+        let totalSeconds =
+            customHours * 3600 +
+            customMinutes * 60 +
+            customSeconds
+
+        guard totalSeconds > 0 else {
+            return nil
+        }
+
+        return TimeInterval(totalSeconds)
+    }
+
+
+    // Timing Mode
+
+    private var selectedTimingMode: TimingMode? {
+        switch selectedTimingOption {
+        case .stopwatch:
+            return .stopwatch
+
+        case .timer:
+            guard let duration = selectedTimerDuration else {
+                return nil
+            }
+
+            return .timer(duration: duration)
+        }
+    }
+
+
+    // Validation
+
     private var canStartTask: Bool {
-        let hasTaskText = !taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasTaskText =
+            !taskText
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .isEmpty
 
         guard hasTaskText else {
             return false
         }
 
         if selectedTimingOption == .timer {
-            return selectedTimingMode != nil
+            return selectedTimerDuration != nil
         }
 
         return true
-    }
-
-    // Converts start selection into model timing mode.
-    private var selectedTimingMode: TimingMode? {
-        switch selectedTimingOption {
-        case .stopwatch:
-            return .stopwatch
-        case .timer:
-            return TimingMode.timer(minutesText: timerMinutesText)
-        }
     }
 
     // Chooses active display or rename editor.
