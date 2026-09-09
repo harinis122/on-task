@@ -38,6 +38,8 @@ struct OutlineButtonStyle: ButtonStyle {
 struct MenuView: View {
     let focusSession: FocusSession
 
+    @Environment(\.openSettings) private var openSettings
+
     @State private var taskText = ""
     @State private var selectedTimingOption = StartTimingOption.stopwatch
     @State private var timerMinutesText = "\(TimingMode.defaultTimerMinutes)"
@@ -62,6 +64,11 @@ struct MenuView: View {
 
             Divider()
                 .opacity(0.45)
+
+            Button("Settings…") {
+                openSettings()
+            }
+            .buttonStyle(OutlineButtonStyle())
 
             Button("Quit OnTask") {
                 requestQuit()

@@ -18,7 +18,7 @@ Prefer small, understandable, independently testable changes.
 
 # 2. Product Overview
 
-**OnTask** is a native macOS menu bar application that keeps the user's current task visible while they work.
+**OnTask** is a menu-bar-first native macOS focus application that keeps the user's current task visible while they work.
 
 The core problem OnTask solves is simple:
 
@@ -145,7 +145,18 @@ The menu bar should not permanently display elapsed or remaining time unless exp
 
 Clicking the OnTask menu bar item opens the application's menu interface.
 
-The MVP menu is the application's primary interface.
+The menu-bar popup is the application's primary user experience.
+
+OnTask should not have a traditional main application window unless a future feature creates a clear product need for one.
+
+Keep the existing AppKit-based menu-bar architecture:
+
+* `NSStatusItem` creates and manages the menu-bar item,
+* `NSPopover` provides the menu-bar popup,
+* `NSHostingController` hosts the SwiftUI `MenuView`,
+* `MenuView.swift` remains the primary focus-session UI.
+
+Do **not** replace this architecture with SwiftUI `MenuBarExtra` unless explicitly requested.
 
 The main MVP UI belongs in:
 
@@ -155,7 +166,7 @@ Views/MenuView.swift
 
 Do not create unnecessary additional views until the UI is complicated enough to justify them.
 
-For the current MVP, `MenuView` may contain the complete OnTask interface.
+For the current MVP, `MenuView` may contain the complete active-use OnTask interface.
 
 ---
 
@@ -230,7 +241,8 @@ When a current task exists, the menu should display:
 * restart control,
 * rename/change-task control,
 * done/clear control,
-* quit control.
+* quit control,
+* link/button to Settings when needed.
 
 Displayed time means:
 
@@ -259,7 +271,43 @@ Behavior is more important than exact placement.
 
 ---
 
-# 8. Task Semantics
+# 8. Settings Architecture
+
+OnTask has a dedicated SwiftUI settings view:
+
+```text
+Views/SettingsView.swift
+```
+
+`OnTaskApp.swift` should expose it through the SwiftUI Settings scene:
+
+```swift
+Settings {
+    SettingsView()
+}
+```
+
+Settings should **not** automatically open when OnTask launches.
+
+Users should be able to open Settings from the menu-bar popup when needed.
+
+Persistent or infrequently changed options should live in Settings rather than making `MenuView` bulky.
+
+Use lightweight persistence such as `@AppStorage` / `UserDefaults` for simple preferences unless requirements later justify something more complex.
+
+Examples of settings that belong in `SettingsView` include:
+
+* focus check-in alerts enabled,
+* check-in interval,
+* default Timer duration,
+* sound preferences,
+* calendar sync preferences.
+
+Do not move core timer functionality into `SettingsView`.
+
+---
+
+# 9. Task Semantics
 
 The application may have:
 
@@ -299,7 +347,7 @@ The exact internal representation may vary if a cleaner implementation exists.
 
 ---
 
-# 9. Session Lifetime
+# 10. Session Lifetime
 
 A focus session exists only while OnTask is running.
 
@@ -340,7 +388,7 @@ Do not restore the previous task, timing mode, configured duration, elapsed time
 
 ---
 
-# 10. Starting a Task
+# 11. Starting a Task
 
 Starting a task should:
 
@@ -357,7 +405,7 @@ Avoid unnecessary validation beyond what is useful for this small app.
 
 ---
 
-# 11. Timer Input
+# 12. Timer Input
 
 Timer mode requires a positive whole number of minutes.
 
@@ -374,7 +422,7 @@ Do not add advanced duration parsing unless explicitly requested.
 
 ---
 
-# 12. TimingMode
+# 13. TimingMode
 
 `TimingMode` describes how `SessionClock` elapsed time is interpreted.
 
@@ -407,7 +455,7 @@ This is why both modes can share `SessionClock`.
 
 ---
 
-# 13. SessionClock
+# 14. SessionClock
 
 `SessionClock` owns reusable timekeeping mechanics.
 
@@ -473,7 +521,7 @@ Reusable timestamp and elapsed-time mechanics belong in `SessionClock`, not dupl
 
 ---
 
-# 14. Stopwatch Behavior
+# 15. Stopwatch Behavior
 
 Stopwatch counts upward from zero.
 
@@ -494,7 +542,7 @@ Restart resets active elapsed time to zero and immediately runs again.
 
 ---
 
-# 15. Countdown Timer Behavior
+# 16. Countdown Timer Behavior
 
 Timer counts downward from the configured duration.
 
@@ -531,7 +579,7 @@ Restart restores the original configured duration and starts running immediately
 
 ---
 
-# 16. Pause Semantics
+# 17. Pause Semantics
 
 When the timing mode is running and the user pauses it:
 
@@ -559,7 +607,7 @@ For Timer mode, remaining time should stay frozen while paused.
 
 ---
 
-# 17. Resume Semantics
+# 18. Resume Semantics
 
 Resuming a paused focus session should:
 
@@ -572,7 +620,7 @@ Resume must not reset Stopwatch elapsed time or Timer remaining time.
 
 ---
 
-# 18. Restart Semantics
+# 19. Restart Semantics
 
 Restarting keeps the same current task, resets active elapsed time to zero, and begins timing immediately.
 
@@ -605,7 +653,7 @@ Keep restart semantics centralized in `FocusSession`, with elapsed-time mechanic
 
 ---
 
-# 19. Timer Expiration
+# 20. Timer Expiration
 
 When Timer reaches `00:00`:
 
@@ -626,7 +674,7 @@ Low-level elapsed-time mechanics still belong to `SessionClock`.
 
 ---
 
-# 20. AlarmSoundService
+# 21. AlarmSoundService
 
 `AlarmSoundService` has one narrow responsibility:
 
@@ -653,7 +701,7 @@ Do not put audio implementation in `MenuView`, `FocusSession`, or `SessionClock`
 
 ---
 
-# 21. Renaming a Task
+# 22. Renaming a Task
 
 Renaming changes the description of the current task.
 
@@ -693,7 +741,7 @@ Do not implement rename by clearing the task and creating a new one.
 
 ---
 
-# 22. Completing / Clearing a Task
+# 23. Completing / Clearing a Task
 
 For the MVP, marking the task as done and clearing the current task lead to the same resulting focus state:
 
@@ -725,7 +773,7 @@ Do not retain a task history in the MVP.
 
 ---
 
-# 23. Quit Semantics
+# 24. Quit Semantics
 
 Quitting OnTask intentionally ends the current application session.
 
@@ -733,7 +781,7 @@ Because current task and timing state are not persisted, quitting while a task e
 
 Therefore Quit has two behaviors.
 
-## 23.1 Quit With No Current Task
+## 24.1 Quit With No Current Task
 
 If no current task exists:
 
@@ -745,7 +793,7 @@ OnTask quits immediately
 
 No confirmation is necessary.
 
-## 23.2 Quit With an Active Task
+## 24.2 Quit With an Active Task
 
 If a current task exists, whether its Stopwatch or Timer is running, paused, or expired:
 
@@ -796,7 +844,7 @@ A later application launch begins with a new empty session.
 
 ---
 
-# 24. No Persistence in the MVP
+# 25. No Persistence in the MVP
 
 The MVP intentionally does **not** persist the active focus session.
 
@@ -825,6 +873,8 @@ for the current task or timing state.
 
 Task and timing information should exist only in application memory while OnTask is running.
 
+Simple user preferences may persist through Settings when explicitly implemented.
+
 This is a deliberate product decision, not a missing feature.
 
 Fresh launch means:
@@ -838,20 +888,31 @@ expirationState = not expired
 
 ---
 
-# 25. Architecture Overview
+# 26. Architecture Overview
 
-The MVP architecture is:
+The current application architecture is menu-bar first and AppKit-backed:
 
 ```text
-                         OnTaskApp
-                            │
-                            ▼
+OnTaskApp
+├── NSStatusItem
+│   └── menu-bar icon/task label
+├── NSPopover
+│   └── NSHostingController
+│       └── MenuView
+└── SwiftUI Settings scene
+    └── SettingsView
+```
+
+Do **not** replace this with SwiftUI `MenuBarExtra` unless explicitly requested.
+
+The primary focus-session model architecture is:
+
+```text
                     ┌────────────────┐
                     │  FocusSession  │
                     │    (Model)     │
                     └───────┬────────┘
-                         ▲   │
-                         │   │ owns/coordinates
+                         ▲   │ owns/coordinates
                          │   ▼
                     ┌────────────────┐
                     │   TimingMode   │
@@ -867,7 +928,7 @@ The MVP architecture is:
                          ▼
                     ┌────────────────────┐
                     │ AlarmSoundService  │
-                    │     (Model)      │
+                    │ service-like Model │
                     └────────────────────┘
 ```
 
@@ -891,7 +952,10 @@ User
 
 * launches the menu-bar application,
 * creates the shared `FocusSession`,
-* provides that session to `MenuView`,
+* configures `NSStatusItem`,
+* configures `NSPopover`,
+* hosts `MenuView` in `NSHostingController`,
+* exposes `SettingsView` through the SwiftUI Settings scene,
 * handles top-level application wiring.
 
 `FocusSession` remains the single source of truth for the current focus session.
@@ -908,28 +972,33 @@ FocusSession
     └── active elapsed time
 ```
 
-There is no persistence layer in the MVP.
+Active session state remains in-memory only. Simple user preferences may be persisted through Settings when explicitly implemented.
 
 ---
 
-# 26. Repository / Source Structure
+# 27. Repository / Source Structure
 
-The intended MVP source structure is:
+The current intended source structure is approximately:
 
 ```text
 OnTask/
 ├── Views/
-│   └── MenuView.swift
+│   ├── MenuView.swift
+│   └── SettingsView.swift
 ├── Models/
 │   ├── FocusSession.swift
 │   ├── TimingMode.swift
-│   └── SessionClock.swift
+│   ├── SessionClock.swift
 │   └── AlarmSoundService.swift
 ├── OnTaskApp.swift
 └── Assets.xcassets/
 ```
 
-If the actual repository is temporarily flatter during incremental development, do not move files unnecessarily.
+The current Xcode project safely synchronizes `Models/` and `Views/`.
+
+Do not introduce new top-level folders such as `Services/` if doing so requires unsafe or manual Xcode project-file editing.
+
+Service-like classes may remain under `Models/` for now when that is the safest way to preserve target membership.
 
 Do not add folders merely because they might theoretically be useful someday.
 
@@ -937,7 +1006,7 @@ Add new files or directories only when they have an actual responsibility.
 
 ---
 
-# 27. File Responsibilities
+# 28. File Responsibilities
 
 ## `OnTaskApp.swift`
 
@@ -947,7 +1016,9 @@ Responsibilities:
 
 * configure the macOS menu-bar application,
 * create shared `FocusSession` state,
+* configure `NSStatusItem`, `NSPopover`, and `NSHostingController`,
 * connect the root menu UI to that state,
+* expose `SettingsView` through the SwiftUI `Settings` scene,
 * manage top-level application lifecycle concerns.
 
 Keep this file small.
@@ -971,15 +1042,47 @@ Responsibilities include displaying:
 * rename controls,
 * done/clear controls,
 * quit control,
-* quit confirmation UI when appropriate.
+* quit confirmation UI when appropriate,
+* link/button to open Settings when needed.
 
 `MenuView` may collect user input and invoke model behavior.
+
+It should remain focused on active use:
+
+* task entry,
+* Stopwatch/Timer selection,
+* duration selection,
+* start,
+* pause/resume,
+* end session,
+* current elapsed/remaining time,
+* access to Settings.
 
 It should not own underlying focus-session rules.
 
 Do not duplicate timing calculations here if they belong in `FocusSession`, `TimingMode`, or `SessionClock`.
 
 Do not play looping alarm audio directly from `MenuView`.
+
+Do not move persistent or infrequently changed configuration into `MenuView` when it belongs in `SettingsView`.
+
+## `Views/SettingsView.swift`
+
+The dedicated SwiftUI settings UI.
+
+Responsibilities include persistent or infrequently changed preferences such as:
+
+* focus check-in alerts enabled,
+* check-in interval,
+* default Timer duration,
+* sound preferences,
+* calendar sync preferences.
+
+Settings should not automatically open at launch.
+
+Settings should be reachable from the menu-bar popup when needed.
+
+Do not move core active-session controls or timing behavior into `SettingsView`.
 
 ## `Models/FocusSession.swift`
 
@@ -1072,7 +1175,7 @@ Do not place Swift source code in the asset catalog.
 
 ---
 
-# 28. Views vs Models vs Services
+# 29. Views vs Models and Service-Like Types
 
 Use these definitions consistently.
 
@@ -1093,11 +1196,14 @@ Examples:
 * menu sections,
 * formatting,
 * layout,
-* alerts and confirmations.
+* alerts and confirmations,
+* Settings controls.
 
 Views may detect an event such as a click.
 
 Views should delegate the meaning of task and timing actions to the model.
+
+`SettingsView` may read/write simple persisted preferences, but it should not own active focus-session state.
 
 ## Models
 
@@ -1121,33 +1227,40 @@ has the Timer expired?
 
 Models own application state and state transitions.
 
-## Services
+## Service-Like Types
 
-Services answer:
+Service-like types answer:
 
 > **How does the app interact with a narrow operating-system or external facility?**
 
-For the current Timer feature, the only intended service is:
+Current and planned examples include:
 
 ```text
 AlarmSoundService
+FocusAlertService
+CalendarService
 ```
+
+Given current Xcode folder constraints, these may live under `Models/` for now.
 
 Do not introduce broad service layers or manager objects.
 
 ---
 
-# 29. Root UI Philosophy
+# 30. Root UI Philosophy
 
-`MenuView` is the root/master UI container.
+`MenuView` is the root/master UI container for active focus use.
+
+`SettingsView` is a dedicated settings surface, not a replacement main app UI.
 
 For the MVP there is no need for:
 
 ```text
+MainView.swift
 FocusView.swift
 ```
 
-because focus functionality is currently the entire menu.
+because focus functionality is currently the entire menu-bar popup.
 
 Do not create additional UI abstraction merely for symmetry.
 
@@ -1173,14 +1286,19 @@ Do not build those future modules until explicitly requested.
 
 ---
 
-# 30. No Master Model for the MVP
+# 31. No Master Model for the MVP
 
 Do not introduce a generic:
 
 ```text
+MainView
 MasterModel
 AppModel
+AppState
 RootModel
+ViewModels everywhere
+repository layers
+feature-module folders
 ```
 
 for the current MVP unless an actual coordination problem requires it.
@@ -1213,7 +1331,7 @@ Do not preemptively build it.
 
 ---
 
-# 31. Extensibility Philosophy
+# 32. Extensibility Philosophy
 
 The architecture should remain easy to extend without implementing extensions prematurely.
 
@@ -1261,7 +1379,7 @@ contains everything
 
 ---
 
-# 32. Integration Philosophy
+# 33. Integration Philosophy
 
 If OnTask later communicates with external applications or services, that integration should generally not be embedded directly in `MenuView`, `FocusSession`, `TimingMode`, or `SessionClock`.
 
@@ -1283,7 +1401,57 @@ Do not implement integrations unless explicitly requested.
 
 ---
 
-# 33. Pomodoro Extensibility
+# 34. Future Focus Check-In Alerts
+
+OnTask should eventually support optional alerts every X minutes during an active focus session.
+
+The goal is to:
+
+* remind the user what they are currently working on,
+* ask whether they are still on task,
+* help interrupt accidental distraction or zoning out.
+
+The enable/disable preference and interval should live in `SettingsView` and persist with lightweight storage such as `@AppStorage` / `UserDefaults`.
+
+When implemented, prefer a small dedicated type such as:
+
+```text
+FocusAlertService.swift
+```
+
+Do not put notification scheduling logic directly into `MenuView`.
+
+Given current Xcode folder constraints, `FocusAlertService.swift` may live under `Models/`.
+
+Do not implement focus check-in alerts unless explicitly requested.
+
+---
+
+# 35. Future Calendar Integration
+
+OnTask should eventually support optionally adding completed focus sessions to the user's Apple Calendar.
+
+The goal is for focused time to appear alongside the user's existing schedule.
+
+Prefer native macOS calendar integration through EventKit/system calendars initially. This can include Google calendars already configured on the Mac.
+
+Avoid building an OnTask-specific calendar/history UI unless explicitly requested.
+
+`FocusSession` should remain a clean representation of a completed focus session and should be usable by future calendar integration.
+
+A future dedicated type may own EventKit/calendar interaction:
+
+```text
+CalendarService.swift
+```
+
+Given current Xcode folder constraints, `CalendarService.swift` may live under `Models/`.
+
+Do not implement calendar integration unless explicitly requested.
+
+---
+
+# 36. Pomodoro Extensibility
 
 Do not add Pomodoro functionality in the MVP.
 
@@ -1304,7 +1472,7 @@ Do not combine hypothetical Pomodoro behavior into `FocusSession` now.
 
 ---
 
-# 34. UI Design Principles
+# 37. UI Design Principles
 
 OnTask should feel:
 
@@ -1331,7 +1499,7 @@ Its own UI should therefore demand as little attention as reasonably possible.
 
 ---
 
-# 35. Menu-Bar Design Principles
+# 38. Menu-Bar Design Principles
 
 Menu-bar space is scarce.
 
@@ -1351,7 +1519,7 @@ Detailed timing information belongs inside the menu.
 
 ---
 
-# 36. Native macOS First
+# 39. Native macOS First
 
 Prefer native Apple APIs and SwiftUI where reasonable.
 
@@ -1380,7 +1548,7 @@ for functionality that can be implemented cleanly with the native macOS stack.
 
 ---
 
-# 37. Dependencies
+# 40. Dependencies
 
 Prefer standard Apple frameworks.
 
@@ -1403,7 +1571,7 @@ For the MVP, the expected third-party dependency count is:
 
 ---
 
-# 38. State Ownership Rule
+# 41. State Ownership Rule
 
 One of the most important architectural rules:
 
@@ -1435,7 +1603,7 @@ with other components reading or presenting that state.
 
 ---
 
-# 39. Keep Views Thin
+# 42. Keep Views Thin
 
 A view may:
 
@@ -1458,7 +1626,7 @@ If logic becomes difficult to describe as purely UI behavior, it likely belongs 
 
 ---
 
-# 40. Keep Models Focused
+# 43. Keep Models Focused
 
 `FocusSession` should represent focus-session behavior.
 
@@ -1478,7 +1646,7 @@ When a responsibility is genuinely different, introduce an appropriate component
 
 For Timer expiration alarm playback, that component is `AlarmSoundService`.
 
-# 41. Quit Confirmation Responsibility
+# 44. Quit Confirmation Responsibility
 
 The decision about whether quitting would destroy an active session depends on focus-session state.
 
@@ -1508,7 +1676,7 @@ Do not save or restore the session as part of this flow; the confirmation exists
 
 ---
 
-# 42. Error Handling Philosophy
+# 45. Error Handling Philosophy
 
 This is a small local application.
 
@@ -1530,7 +1698,7 @@ Alarm playback failure should not corrupt task or timing state.
 
 ---
 
-# 43. Naming
+# 46. Naming
 
 Prefer descriptive names.
 
@@ -1568,7 +1736,7 @@ Use Swift naming conventions.
 
 ---
 
-# 44. Code Readability
+# 47. Code Readability
 
 Optimize for code that a developer relatively new to Swift can follow.
 
@@ -1586,7 +1754,7 @@ Do not compress understandable logic into difficult one-liners merely to reduce 
 
 ---
 
-# 45. Comments
+# 48. Comments
 
 Comments should explain **why**, especially when behavior is not obvious.
 
@@ -1608,7 +1776,7 @@ Do not over-comment self-explanatory Swift syntax.
 
 ---
 
-# 46. Incremental Development Rule
+# 49. Incremental Development Rule
 
 This repository should be developed incrementally.
 
@@ -1634,7 +1802,7 @@ Small commits and understandable milestones are preferred.
 
 ---
 
-# 47. Before Editing
+# 50. Before Editing
 
 Before making meaningful changes:
 
@@ -1650,7 +1818,7 @@ The repository is the current source of truth for implementation state.
 
 ---
 
-# 48. Existing Code First
+# 51. Existing Code First
 
 Before creating a new abstraction:
 
@@ -1682,7 +1850,7 @@ Do not introduce a master model above `FocusSession`.
 
 ---
 
-# 49. Changes to Project Structure
+# 52. Changes to Project Structure
 
 Do not reorganize the project casually.
 
@@ -1691,7 +1859,6 @@ The intended MVP baseline is:
 ```text
 Views/
 Models/
-Services/
 ```
 
 plus:
@@ -1701,15 +1868,17 @@ OnTaskApp.swift
 Assets.xcassets/
 ```
 
-If a new folder is justified by actual code, it may be introduced.
+If a new folder is justified by actual code and can be added safely through Xcode, it may be introduced.
 
 Do not add empty folders for hypothetical future use.
+
+Do not introduce a new top-level `Services/` folder if doing so requires unsafe or manual `.pbxproj` editing while Xcode is open.
 
 When moving Swift files, preserve Xcode project references and ensure the project builds.
 
 ---
 
-# 50. Build Validation
+# 53. Build Validation
 
 After implementation changes, build the app.
 
@@ -1745,7 +1914,7 @@ Documentation-only changes do not require a build unless the prompt explicitly a
 
 ---
 
-# 12. Runtime Validation
+# 54. Runtime Validation
 
 For UI behavior, compilation alone is insufficient.
 
@@ -1789,7 +1958,7 @@ Only validate behavior relevant to the current implementation stage.
 
 ---
 
-# 52. Testing Philosophy
+# 55. Testing Philosophy
 
 Prefer tests for behavior with meaningful logic, especially timing state transitions.
 
@@ -1821,7 +1990,7 @@ Do not overengineer testability prematurely, but keep deterministic logic in min
 
 ---
 
-# 53. Source Control
+# 56. Source Control
 
 Do not remove or rewrite repository-level project files without need.
 
@@ -1847,7 +2016,7 @@ Do not commit:
 
 ---
 
-# 54. Privacy
+# 57. Privacy
 
 OnTask's MVP is local and session-based.
 
@@ -1867,7 +2036,7 @@ No user account is required.
 
 ---
 
-# 55. Security
+# 58. Security
 
 The MVP handles low-risk local productivity data.
 
@@ -1884,7 +2053,7 @@ Alarm playback should use normal local audio capabilities and should not require
 
 ---
 
-# 56. Performance
+# 59. Performance
 
 OnTask should be lightweight.
 
@@ -1903,7 +2072,7 @@ Timer expiration must still work when the menu popup is closed, so any backgroun
 
 ---
 
-# 57. Accessibility
+# 60. Accessibility
 
 Use standard SwiftUI controls where possible.
 
@@ -1921,7 +2090,7 @@ Confirmation dialogs should clearly identify the destructive action.
 
 ---
 
-# 58. Avoid Premature Features
+# 61. Avoid Premature Features
 
 Do not independently add:
 
@@ -1952,7 +2121,7 @@ Even if such a feature seems useful, it is outside the current MVP unless explic
 
 ---
 
-# 59. Avoid Premature Infrastructure
+# 62. Avoid Premature Infrastructure
 
 Do not independently introduce:
 
@@ -1980,7 +2149,7 @@ Introduce infrastructure only when an actual requirement creates the need.
 
 ---
 
-# 60. Do Not One-Shot the Project
+# 63. Do Not One-Shot the Project
 
 Even though the overall MVP is documented here, do not interpret this document as an instruction to implement everything at once.
 
@@ -2004,53 +2173,58 @@ The purpose of this document is to ensure each incremental change fits the same 
 
 ---
 
-# 61. Current MVP Development Status
+# 64. Current MVP Development Status
 
 The following core behaviors have already been implemented or are considered part of the established MVP design:
 
 ```text
-1. Native menu-bar application shell
-2. MenuView and Quit behavior
-3. FocusSession task state
-4. Set / display current task
-5. Clear / complete current task
-6. Stopwatch timing
-7. Pause / resume
-8. Restart
-9. Rename
-10. Stopwatch visibility control
+1. Native AppKit menu-bar application shell
+2. NSStatusItem / NSPopover / NSHostingController menu-bar popup
+3. MenuView active focus-session UI
+4. SettingsView exposed through the SwiftUI Settings scene
+5. FocusSession task state
+6. Set / display current task
+7. Clear / complete current task
+8. Stopwatch timing
+9. Countdown Timer timing
+10. TimingMode
+11. SessionClock shared timing mechanics
+12. AlarmSoundService for Timer completion sound
+13. Pause / resume
+14. Restart
+15. Rename
+16. Time visibility control
 ```
 
 Do not reimplement working functionality unnecessarily.
 
-The following Timer-related work is upcoming and should not be marked as implemented until confirmed in the repository:
+The following work is planned direction and should not be marked as implemented until confirmed in the repository:
 
 ```text
-1. Stopwatch vs Timer selector
-2. Countdown Timer
-3. TimingMode
-4. SessionClock refactor
-5. Timer expiration handling
-6. AlarmSoundService
+1. Persistent Settings options beyond any current basics
+2. Focus check-in alerts
+3. FocusAlertService
+4. Optional calendar sync for completed sessions
+5. CalendarService
 ```
 
-No persistence milestone exists in the current MVP.
+Active focus-session persistence remains intentionally out of scope.
 
 ---
 
-# 62. Incremental Timer Development Path
+# 65. Incremental Future Development Path
 
-Timer-related work should be implemented in small, reviewable steps.
+Future work should be implemented in small, reviewable steps.
 
-A reasonable order is:
+Reasonable future increments include:
 
-1. Refactor existing Stopwatch logic into `SessionClock` without behavior changes.
-2. Add `TimingMode`.
-3. Add Stopwatch/Timer selection UI.
-4. Add countdown Timer behavior.
-5. Add expiration detection.
-6. Add `AlarmSoundService`.
-7. Test and polish.
+1. Add Settings controls for a specific preference.
+2. Persist that preference with `@AppStorage` / `UserDefaults`.
+3. Add focus check-in alert scheduling behind a persisted enable/interval preference.
+4. Extract `FocusAlertService` only when check-in scheduling is implemented.
+5. Add optional calendar export for completed sessions.
+6. Extract `CalendarService` only when EventKit/calendar interaction is implemented.
+7. Test and polish the requested increment.
 
 Do **not** implement these steps merely because they are documented here.
 
@@ -2058,7 +2232,7 @@ Only implement the step explicitly requested by the current prompt.
 
 ---
 
-# 63. Architecture Decision Rule
+# 66. Architecture Decision Rule
 
 When unsure where code belongs, ask:
 
@@ -2083,7 +2257,7 @@ Models/
 Put it in:
 
 ```text
-Services/
+Models/ for now, unless the project safely supports another synchronized folder
 ```
 
 ### Is this about application startup and top-level wiring?
@@ -2105,13 +2279,17 @@ TimingMode                        → TimingMode
 Elapsed active-time calculation   → SessionClock
 Countdown remaining-time display  → TimingMode / FocusSession coordination
 Timer expiration state            → FocusSession
-Alarm audio playback              → AlarmSoundService
+Alarm audio playback              → AlarmSoundService under Models/ for now
+Settings UI                       → SettingsView
+Simple persisted preference       → SettingsView / @AppStorage
+Focus check-in scheduling         → future FocusAlertService under Models/ for now
+Calendar/EventKit interaction     → future CalendarService under Models/ for now
 Menu-bar label wiring             → OnTaskApp
 ```
 
 ---
 
-# 64. Example Event Flow: Pause
+# 67. Example Event Flow: Pause
 
 A correct pause flow looks like:
 
@@ -2133,7 +2311,7 @@ MenuView reflects paused state
 
 ---
 
-# 65. Example Event Flow: Timer Expiration
+# 68. Example Event Flow: Timer Expiration
 
 A correct Timer expiration flow looks like:
 
@@ -2157,7 +2335,7 @@ Expiration should not clear the task or start Pomodoro behavior.
 
 ---
 
-# 66. Example Event Flow: Quit
+# 69. Example Event Flow: Quit
 
 A correct quit flow looks like:
 
@@ -2177,7 +2355,7 @@ Quit confirmation is temporary UI state, not focus-session state.
 
 ---
 
-# 67. Central Engineering Principle
+# 70. Central Engineering Principle
 
 The central rule for OnTask is:
 
@@ -2190,14 +2368,15 @@ That means:
 * one selected `TimingMode` per session,
 * one reusable `SessionClock` for active-time mechanics,
 * one narrow `AlarmSoundService` for alarm playback,
+* Settings for persistent or infrequently changed preferences,
 * no task lists,
-* no persistence,
+* no active focus-session persistence,
 * no Pomodoro until explicitly requested,
 * no broad infrastructure without a concrete requirement.
 
 ---
 
-# 68. Definition of a Good Change
+# 71. Definition of a Good Change
 
 A good change in this repository:
 
@@ -2206,6 +2385,7 @@ A good change in this repository:
 * preserves existing behavior unless intentionally changed,
 * uses native macOS/SwiftUI APIs where practical,
 * avoids third-party dependencies,
-* avoids persistence unless explicitly requested,
+* avoids active-session persistence unless explicitly requested,
+* uses lightweight preference persistence only when the requested feature needs it,
 * leaves the app lightweight and easy to understand,
 * builds successfully when code changes are made.

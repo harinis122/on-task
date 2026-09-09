@@ -16,7 +16,7 @@ struct OnTaskApp: App {
     // Provides the required SwiftUI scene without windows.
     var body: some Scene {
         Settings {
-            EmptyView()
+            SettingsView()
         }
     }
 }
