@@ -106,7 +106,7 @@ final class FocusSession {
         sessionClock.start(now: now)
         refreshTimingState(now: now)
         startRefreshTimer()
-        focusAlertService.startCheckIns(for: trimmedTask)
+        startFocusCheckInsForCurrentTask()
         return true
     }
 
@@ -240,7 +240,15 @@ final class FocusSession {
             return
         }
 
-        focusAlertService.startCheckIns(for: currentTask)
+        focusAlertService.startCheckIns(
+            for: currentTask,
+            onPause: { [weak self] in
+                self?.pauseTiming()
+            },
+            onEndSession: { [weak self] in
+                self?.completeCurrentTask()
+            }
+        )
     }
 
     // Keeps check-in alert text aligned after rename.

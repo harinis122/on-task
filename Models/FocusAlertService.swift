@@ -11,7 +11,11 @@ import SwiftUI
 
 protocol FocusAlertScheduling: AnyObject {
     // Starts repeating check-ins for the active task.
-    func startCheckIns(for task: String)
+    func startCheckIns(
+        for task: String,
+        onPause: @escaping () -> Void,
+        onEndSession: @escaping () -> Void
+    )
 
     // Cancels any scheduled or visible check-ins.
     func stopCheckIns()
@@ -27,6 +31,8 @@ final class FocusAlertService: FocusAlertScheduling {
     private var activeTask: String?
     private var alertPanel: NSPanel?
     private var checkInTimer: Timer?
+    private var pauseAction: (() -> Void)?
+    private var endSessionAction: (() -> Void)?
     private var settingsObserver: NSObjectProtocol?
 
     // Creates alert scheduling with persisted settings.
@@ -36,9 +42,15 @@ final class FocusAlertService: FocusAlertScheduling {
     }
 
     // Starts repeating check-ins when settings allow them.
-    func startCheckIns(for task: String) {
+    func startCheckIns(
+        for task: String,
+        onPause: @escaping () -> Void,
+        onEndSession: @escaping () -> Void
+    ) {
         stopCheckIns()
         activeTask = task
+        pauseAction = onPause
+        endSessionAction = onEndSession
 
         guard areCheckInsEnabled else {
             return
@@ -50,6 +62,8 @@ final class FocusAlertService: FocusAlertScheduling {
     // Cancels scheduled check-ins and visible alerts.
     func stopCheckIns() {
         activeTask = nil
+        pauseAction = nil
+        endSessionAction = nil
         checkInTimer?.invalidate()
         checkInTimer = nil
         closeCheckInPanel()
@@ -144,10 +158,14 @@ final class FocusAlertService: FocusAlertScheduling {
 
         let contentView = FocusCheckInAlertView(task: task) { [weak self] in
             self?.handleCheckInAcknowledgement()
+        } onPause: { [weak self] in
+            self?.handlePauseRequest()
+        } onEndSession: { [weak self] in
+            self?.handleEndSessionRequest()
         }
 
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 168),
+            contentRect: NSRect(x: 0, y: 0, width: 280, height: 220),
             styleMask: [.titled, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -175,6 +193,20 @@ final class FocusAlertService: FocusAlertScheduling {
         scheduleNextCheckIn()
     }
 
+    // Reuses the focus session's pause behavior.
+    private func handlePauseRequest() {
+        let pauseAction = pauseAction
+        closeCheckInPanel()
+        pauseAction?()
+    }
+
+    // Reuses the focus session's end behavior.
+    private func handleEndSessionRequest() {
+        let endSessionAction = endSessionAction
+        closeCheckInPanel()
+        endSessionAction?()
+    }
+
     // Closes the current custom check-in panel.
     private func closeCheckInPanel() {
         alertPanel?.close()
@@ -185,25 +217,116 @@ final class FocusAlertService: FocusAlertScheduling {
 private struct FocusCheckInAlertView: View {
     let task: String
     let onConfirm: () -> Void
+    let onPause: () -> Void
+    let onEndSession: () -> Void
 
     // Displays the custom still-on-task prompt.
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 10) {
             Text("Still on task?")
-                .font(.headline)
+                .font(.system(size: 21, weight: .bold))
 
-            Text("You're currently focusing on \"\(task)\".")
-                .font(.body)
-                .foregroundStyle(.secondary)
+            taskSentence
+                .font(.system(size: 14))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Button("Yes", action: onConfirm)
-                .buttonStyle(.borderedProminent)
+            VStack(spacing: 8) {
+                Button(action: onConfirm) {
+                    Label("Yes, still on it", systemImage: "checkmark")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(PrimaryCheckInButtonStyle())
                 .keyboardShortcut(.defaultAction)
+
+                Button(action: onConfirm) {
+                    Label("Drifted — refocusing now", systemImage: "scope")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(OutlinedCheckInButtonStyle())
+            }
+
+            Divider()
+
+            HStack(spacing: 14) {
+                Button("Pause", action: onPause)
+                    .buttonStyle(SecondaryCheckInButtonStyle())
+
+                Button("End session", action: onEndSession)
+                    .buttonStyle(SecondaryCheckInButtonStyle())
+            }
         }
-        .padding(22)
-        .frame(width: 320)
+        .padding(14)
+        .frame(width: 280)
         .background(.regularMaterial)
+    }
+
+    // Builds the sentence with styled task text.
+    private var taskSentence: Text {
+        Text("You've been focusing on ")
+            .foregroundStyle(.secondary)
+        + Text(task)
+            .fontWeight(.semibold)
+            .foregroundStyle(.primary)
+        + Text("!")
+            .foregroundStyle(.secondary)
+    }
+}
+
+private struct PrimaryCheckInButtonStyle: ButtonStyle {
+    // Builds the filled primary check-in action.
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .semibold))
+            .labelStyle(.titleAndIcon)
+            .foregroundStyle(.white)
+            .padding(.vertical, 9)
+            .padding(.horizontal, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.accentColor)
+            )
+            .opacity(configuration.isPressed ? 0.75 : 1)
+    }
+}
+
+private struct OutlinedCheckInButtonStyle: ButtonStyle {
+    // Builds the quieter outlined check-in action.
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .semibold))
+            .labelStyle(.titleAndIcon)
+            .foregroundStyle(.primary)
+            .padding(.vertical, 9)
+            .padding(.horizontal, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.42))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.secondary.opacity(0.32), lineWidth: 1)
+            )
+            .opacity(configuration.isPressed ? 0.68 : 1)
+    }
+}
+
+private struct SecondaryCheckInButtonStyle: ButtonStyle {
+    // Builds compact muted secondary alert actions.
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.primary)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 9)
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.35))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 9)
+                    .stroke(Color.secondary.opacity(0.28), lineWidth: 1)
+            )
+            .opacity(configuration.isPressed ? 0.65 : 1)
     }
 }
