@@ -22,11 +22,16 @@ final class FocusSession {
 
     @ObservationIgnored private var sessionClock = SessionClock()
     @ObservationIgnored private let alarmSoundService: AlarmSoundPlaying
+    @ObservationIgnored private let focusAlertService: FocusAlertScheduling
     @ObservationIgnored private var refreshTimer: Timer?
 
-    // Creates a focus session with alarm support.
-    init(alarmSoundService: AlarmSoundPlaying = AlarmSoundService()) {
+    // Creates a focus session with service support.
+    init(
+        alarmSoundService: AlarmSoundPlaying = AlarmSoundService(),
+        focusAlertService: FocusAlertScheduling = FocusAlertService()
+    ) {
         self.alarmSoundService = alarmSoundService
+        self.focusAlertService = focusAlertService
     }
 
     // Reports whether a task is currently active.
@@ -101,6 +106,7 @@ final class FocusSession {
         sessionClock.start(now: now)
         refreshTimingState(now: now)
         startRefreshTimer()
+        focusAlertService.startCheckIns(for: trimmedTask)
         return true
     }
 
@@ -113,6 +119,7 @@ final class FocusSession {
         sessionClock.pause(now: now)
         refreshTimingState(now: now)
         stopRefreshTimer()
+        focusAlertService.stopCheckIns()
     }
 
     // Preserves old pause name for existing callers.
@@ -129,6 +136,7 @@ final class FocusSession {
         sessionClock.resume(now: now)
         refreshTimingState(now: now)
         startRefreshTimer()
+        startFocusCheckInsForCurrentTask()
     }
 
     // Preserves old resume name for existing callers.
@@ -147,6 +155,7 @@ final class FocusSession {
         sessionClock.restart(now: now)
         refreshTimingState(now: now)
         startRefreshTimer()
+        startFocusCheckInsForCurrentTask()
     }
 
     // Preserves old restart name for existing callers.
@@ -183,6 +192,7 @@ final class FocusSession {
         }
 
         currentTask = trimmedTask
+        restartFocusCheckInsAfterRename()
         return true
     }
 
@@ -196,6 +206,7 @@ final class FocusSession {
     private func resetTiming() {
         stopRefreshTimer()
         alarmSoundService.stopAlarm()
+        focusAlertService.stopCheckIns()
         sessionClock.reset()
         timingMode = .stopwatch
         activeElapsedTime = 0
@@ -223,6 +234,24 @@ final class FocusSession {
         refreshTimer = nil
     }
 
+    // Starts check-ins for the current task.
+    private func startFocusCheckInsForCurrentTask() {
+        guard let currentTask else {
+            return
+        }
+
+        focusAlertService.startCheckIns(for: currentTask)
+    }
+
+    // Keeps check-in alert text aligned after rename.
+    private func restartFocusCheckInsAfterRename() {
+        guard isTimingRunning else {
+            return
+        }
+
+        startFocusCheckInsForCurrentTask()
+    }
+
     // Recalculates displayed time from clock state.
     private func refreshTimingState(now: Date = Date()) {
         activeElapsedTime = sessionClock.elapsedTime(now: now)
@@ -247,6 +276,7 @@ final class FocusSession {
         displayedTime = 0
         isTimingRunning = false
         stopRefreshTimer()
+        focusAlertService.stopCheckIns()
         alarmSoundService.startAlarm()
     }
 

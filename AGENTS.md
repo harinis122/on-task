@@ -990,6 +990,7 @@ OnTask/
 │   ├── TimingMode.swift
 │   ├── SessionClock.swift
 │   └── AlarmSoundService.swift
+│   └── FocusAlertService.swift
 ├── OnTaskApp.swift
 └── Assets.xcassets/
 ```
@@ -1401,9 +1402,9 @@ Do not implement integrations unless explicitly requested.
 
 ---
 
-# 34. Future Focus Check-In Alerts
+# 34. Focus Check-In Alerts
 
-OnTask should eventually support optional alerts every X minutes during an active focus session.
+OnTask should support optional alerts every X minutes during an active focus session.
 
 The goal is to:
 
@@ -2282,7 +2283,7 @@ Timer expiration state            → FocusSession
 Alarm audio playback              → AlarmSoundService under Models/ for now
 Settings UI                       → SettingsView
 Simple persisted preference       → SettingsView / @AppStorage
-Focus check-in scheduling         → future FocusAlertService under Models/ for now
+Focus check-in scheduling         → FocusAlertService under Models/ for now
 Calendar/EventKit interaction     → future CalendarService under Models/ for now
 Menu-bar label wiring             → OnTaskApp
 ```
