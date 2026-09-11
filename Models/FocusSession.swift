@@ -5,6 +5,7 @@
 //  Created by Harini Suresh on 8/18/26.
 //
 
+import AppKit
 import Foundation
 import Observation
 
@@ -24,6 +25,7 @@ final class FocusSession {
     @ObservationIgnored private let alarmSoundService: AlarmSoundPlaying
     @ObservationIgnored private let focusAlertService: FocusAlertScheduling
     @ObservationIgnored private var refreshTimer: Timer?
+    @ObservationIgnored private var sleepObservers: [NSObjectProtocol] = []
 
     // Creates a focus session with service support.
     init(
@@ -32,6 +34,12 @@ final class FocusSession {
     ) {
         self.alarmSoundService = alarmSoundService
         self.focusAlertService = focusAlertService
+        observeSystemSleepEvents()
+    }
+
+    // Removes sleep observers when the session deallocates.
+    deinit {
+        removeSystemSleepObservers()
     }
 
     // Reports whether a task is currently active.
@@ -232,6 +240,41 @@ final class FocusSession {
     private func stopRefreshTimer() {
         refreshTimer?.invalidate()
         refreshTimer = nil
+    }
+
+    // Watches display and system sleep notifications.
+    private func observeSystemSleepEvents() {
+        let notificationCenter = NSWorkspace.shared.notificationCenter
+        let sleepNotifications: [NSNotification.Name] = [
+            NSWorkspace.screensDidSleepNotification,
+            NSWorkspace.willSleepNotification
+        ]
+
+        sleepObservers = sleepNotifications.map { notificationName in
+            notificationCenter.addObserver(
+                forName: notificationName,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.pauseForSystemSleep()
+            }
+        }
+    }
+
+    // Cleans up display and system sleep observers.
+    private func removeSystemSleepObservers() {
+        let notificationCenter = NSWorkspace.shared.notificationCenter
+
+        sleepObservers.forEach { observer in
+            notificationCenter.removeObserver(observer)
+        }
+
+        sleepObservers = []
+    }
+
+    // Pauses active timing before sleep without resuming later.
+    private func pauseForSystemSleep() {
+        pauseTiming()
     }
 
     // Starts check-ins for the current task.
