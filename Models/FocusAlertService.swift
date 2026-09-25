@@ -215,6 +215,7 @@ final class FocusAlertService: FocusAlertScheduling {
 }
 
 private struct FocusCheckInAlertView: View {
+
     let task: String
     let onConfirm: () -> Void
     let onPause: () -> Void
@@ -222,9 +223,11 @@ private struct FocusCheckInAlertView: View {
 
     // Displays the custom still-on-task prompt.
     var body: some View {
-        VStack(spacing: 10) {
+
+        VStack(spacing: 8) {
+
             Text("Still on task?")
-                .font(.system(size: 21, weight: .bold))
+                .font(.system(size: 20, weight: .bold))
 
             taskSentence
                 .font(.system(size: 14))
@@ -232,44 +235,64 @@ private struct FocusCheckInAlertView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             VStack(spacing: 8) {
+
                 Button(action: onConfirm) {
-                    Label("Yes, still on it", systemImage: "checkmark")
+                    Label("Yes, still on it!", systemImage: "checkmark")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(PrimaryCheckInButtonStyle())
                 .keyboardShortcut(.defaultAction)
 
                 Button(action: onConfirm) {
-                    Label("Drifted — refocusing now", systemImage: "scope")
+                    Label(
+                        "Getting back on task!",
+                        systemImage: "scope"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(OutlinedCheckInButtonStyle())
+            }
+            .padding(.top, 4)
+
+            Divider()
+                .padding(.vertical, 2)
+
+            VStack(spacing: 8) {
+
+                Button(action: onPause) {
+                    Label("Pause", systemImage: "pause.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(OutlinedCheckInButtonStyle())
+
+                Button(action: onEndSession) {
+                    Label("End task", systemImage: "stop.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(OutlinedCheckInButtonStyle())
             }
-
-            Divider()
-
-            HStack(spacing: 14) {
-                Button("Pause", action: onPause)
-                    .buttonStyle(SecondaryCheckInButtonStyle())
-
-                Button("End session", action: onEndSession)
-                    .buttonStyle(SecondaryCheckInButtonStyle())
-            }
         }
-        .padding(14)
-        .frame(width: 280)
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 48)
+        .frame(width: 280, alignment: .top)
         .background(.regularMaterial)
     }
 
     // Builds the sentence with styled task text.
     private var taskSentence: Text {
-        Text("You've been focusing on ")
+
+        let prefix = Text("You've been focusing on ")
             .foregroundStyle(.secondary)
-        + Text(task)
+
+        let taskText = Text(task)
             .fontWeight(.semibold)
             .foregroundStyle(.primary)
-        + Text("!")
+
+        let suffix = Text("!")
             .foregroundStyle(.secondary)
+
+        return Text("\(prefix)\(taskText)\(suffix)")
     }
 }
 
@@ -277,7 +300,7 @@ private struct PrimaryCheckInButtonStyle: ButtonStyle {
     // Builds the filled primary check-in action.
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 14, weight: .semibold))
+            .font(.system(size: 14, weight: .regular))
             .labelStyle(.titleAndIcon)
             .foregroundStyle(.white)
             .padding(.vertical, 9)
@@ -294,7 +317,7 @@ private struct OutlinedCheckInButtonStyle: ButtonStyle {
     // Builds the quieter outlined check-in action.
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 14, weight: .semibold))
+            .font(.system(size: 14, weight: .regular))
             .labelStyle(.titleAndIcon)
             .foregroundStyle(.primary)
             .padding(.vertical, 9)
