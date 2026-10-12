@@ -22,6 +22,14 @@ struct OnTaskApp: App {
 }
 
 final class OnTaskAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+    private static let reservedMenuBarTimeText = "00:00:00"
+    private static let activeTaskTitleMaxWidth: CGFloat = 84
+    private static let activeStatusItemHorizontalPadding: CGFloat = 24
+    private static let activeStatusItemIconWidth: CGFloat = 13
+    private static let activeStatusItemIconSpacing: CGFloat = 8
+    private static let menuBarIconTitleSpacing = " "
+    private static let menuBarSeparator = " · "
+
     private let focusSession = FocusSession()
     private let popover = NSPopover()
     private var statusItem: NSStatusItem?
@@ -75,6 +83,8 @@ final class OnTaskAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegat
     private func observeStateChanges() {
         withObservationTracking {
             _ = focusSession.menuBarTaskTitle
+            _ = focusSession.displayedTimeText
+            _ = focusSession.isTimeVisible
         } onChange: { [weak self] in
             DispatchQueue.main.async {
                 self?.updateStatusItem()
@@ -90,18 +100,121 @@ final class OnTaskAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegat
         }
 
         if let taskTitle = focusSession.menuBarTaskTitle {
-            button.image = nil
-            button.title = taskTitle
-            button.contentTintColor = nil
+            let displayTaskTitle = truncatedTaskTitle(taskTitle, button: button)
+
+            button.image = activeStatusIconImage()
+            button.imagePosition = .imageLeading
+            button.imageScaling = .scaleProportionallyDown
+            button.attributedTitle = menuBarAttributedTitle(for: displayTaskTitle, button: button)
+            button.contentTintColor = NSColor.labelColor.withAlphaComponent(0.85)
+            button.layer?.cornerRadius = max(button.bounds.height / 2, 5)
             button.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.28).cgColor
-            statusItem.length = NSStatusItem.variableLength
+            statusItem.length = activeStatusItemLength(for: displayTaskTitle, button: button)
         } else {
+            button.attributedTitle = NSAttributedString(string: "")
             button.title = ""
             button.image = statusIconImage()
+            button.imagePosition = .imageOnly
             button.contentTintColor = nil
+            button.layer?.cornerRadius = 5
             button.layer?.backgroundColor = NSColor.clear.cgColor
             statusItem.length = 28
         }
+    }
+
+    // Combines the task title with visible Stopwatch or Timer time.
+    private func menuBarAttributedTitle(for taskTitle: String, button: NSStatusBarButton) -> NSAttributedString {
+        let font = button.font ?? NSFont.menuBarFont(ofSize: 0)
+        let timeFont = NSFont.monospacedDigitSystemFont(ofSize: font.pointSize, weight: .regular)
+        let title = NSMutableAttributedString(
+            string: "\(Self.menuBarIconTitleSpacing)\(taskTitle)",
+            attributes: [.font: font, .foregroundColor: NSColor.labelColor]
+        )
+
+        guard focusSession.isTimeVisible else {
+            return title
+        }
+
+        title.append(
+            NSAttributedString(
+                string: Self.menuBarSeparator,
+                attributes: [.font: font, .foregroundColor: NSColor.labelColor.withAlphaComponent(0.4)]
+            )
+        )
+        title.append(
+            NSAttributedString(
+                string: focusSession.displayedTimeText,
+                attributes: [.font: timeFont, .foregroundColor: NSColor.labelColor]
+            )
+        )
+
+        return title
+    }
+
+    // Truncates task text by rendered width so the Timer remains fully visible.
+    private func truncatedTaskTitle(_ taskTitle: String, button: NSStatusBarButton) -> String {
+        let font = button.font ?? NSFont.menuBarFont(ofSize: 0)
+
+        guard textWidth(taskTitle, font: font) > Self.activeTaskTitleMaxWidth else {
+            return taskTitle
+        }
+
+        let ellipsis = "..."
+        var truncatedTitle = taskTitle
+
+        while !truncatedTitle.isEmpty {
+            truncatedTitle.removeLast()
+
+            if textWidth("\(truncatedTitle)\(ellipsis)", font: font) <= Self.activeTaskTitleMaxWidth {
+                return "\(truncatedTitle)\(ellipsis)"
+            }
+        }
+
+        return ellipsis
+    }
+
+    // Reserves enough menu-bar width for an hours-format time value.
+    private func activeStatusItemLength(for taskTitle: String, button: NSStatusBarButton) -> CGFloat {
+        let font = button.font ?? NSFont.menuBarFont(ofSize: 0)
+        let timeFont = NSFont.monospacedDigitSystemFont(ofSize: font.pointSize, weight: .regular)
+        let taskWidth = textWidth(taskTitle, font: font)
+        let titleSpacingWidth = textWidth(Self.menuBarIconTitleSpacing, font: font)
+        let iconWidth = Self.activeStatusItemIconWidth + Self.activeStatusItemIconSpacing
+
+        guard focusSession.isTimeVisible else {
+            return ceil(iconWidth + titleSpacingWidth + taskWidth + Self.activeStatusItemHorizontalPadding)
+        }
+
+        let separatorWidth = textWidth(Self.menuBarSeparator, font: font)
+        let timeWidth = textWidth(Self.reservedMenuBarTimeText, font: timeFont)
+
+        return ceil(iconWidth + titleSpacingWidth + taskWidth + separatorWidth + timeWidth + Self.activeStatusItemHorizontalPadding)
+    }
+
+    // Measures menu-bar text using its rendered font.
+    private func textWidth(_ text: String, font: NSFont) -> CGFloat {
+        (text as NSString).size(withAttributes: [.font: font]).width
+    }
+
+    // Draws the active task checkmark as a single template stroke.
+    private func activeStatusIconImage() -> NSImage {
+        let image = NSImage(size: NSSize(width: 13, height: 13))
+
+        image.lockFocus()
+        NSColor.black.setStroke()
+
+        let checkPath = NSBezierPath()
+        checkPath.lineWidth = 1.35
+        checkPath.lineCapStyle = .round
+        checkPath.lineJoinStyle = .round
+        checkPath.move(to: NSPoint(x: 2.2, y: 6.8))
+        checkPath.line(to: NSPoint(x: 5.2, y: 3.8))
+        checkPath.line(to: NSPoint(x: 10.8, y: 9.6))
+        checkPath.stroke()
+
+        image.unlockFocus()
+        image.isTemplate = true
+        return image
     }
 
     // Draws template icon for system contrast.
