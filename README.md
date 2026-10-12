@@ -15,7 +15,7 @@ OnTask is designed to answer one question:
 
 By keeping the current task in the macOS menu bar, OnTask helps you stay aware of your intention, focus on one thing at a time, and avoid mindless task switching or multitasking.
 
-It also tracks how long the current task has been active, making it easier to stay aware of where your time is going.
+It also tracks the current focus session with either a Stopwatch or countdown Timer, making it easier to stay aware of where your time is going.
 
 ## How It Works
 
@@ -24,11 +24,14 @@ When OnTask is running:
 * If no task is set, a small icon appears in the macOS menu bar.
 * Click the icon to set a current task.
 * The task is displayed directly in the menu bar.
+* When time is shown, the menu bar also displays the current Stopwatch elapsed time or Timer remaining time.
 * The menu bar view and task color are consistent with the macOS color theme.
-* Click the task to view its full name and elapsed time.
-* Pause, resume, or restart the stopwatch when needed.
-* Rename the current task without resetting the stopwatch.
+* Click the task to view its full name, timing mode, and detailed time.
+* Pause, resume, or restart timing when needed.
+* Hide or show the menu-bar time from the popup.
+* Rename the current task without resetting timing.
 * Mark the task as done or clear it to return to the icon-only state.
+* Optional focus check-ins can periodically ask whether you are still on task.
 * Quit OnTask to remove it completely from the menu bar.
 
 ## Goal
@@ -90,17 +93,18 @@ It's not a task manager or productivity dashboard. Its purpose is to keep your *
 
 - Click the OnTask icon in the menu bar.
 - Enter the task you want to focus on.
-- Start the task to begin tracking your time.
-- Your current task remains visible in the menu bar.
+- Choose Stopwatch or Timer, then start the task to begin tracking your time.
+- Your current task remains visible in the menu bar, with the current time shown when enabled.
 - Click the menu-bar item at any time to:
-  - Pause or resume the timer
-  - Restart the timer
+  - Pause or resume timing
+  - Restart timing
   - Rename the current task
+  - Hide or show the menu-bar time
   - Mark the task as done
-  - Change the appearance color
-- Selecting **Done** clears the current task and resets the timer.
+  - Open Settings for focus check-in preferences
+- Selecting **Done** clears the current task and resets timing.
 
-OnTask keeps the current focus session only while the app is running. Quitting the app clears the current task and timer.
+OnTask keeps the current focus session only while the app is running. Quitting the app clears the current task and timing state.
 
 ### macOS Security Warning
 
