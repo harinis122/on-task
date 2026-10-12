@@ -27,6 +27,7 @@ final class OnTaskAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegat
     private static let activeStatusItemHorizontalPadding: CGFloat = 24
     private static let activeStatusItemIconWidth: CGFloat = 13
     private static let activeStatusItemIconSpacing: CGFloat = 8
+    private static let activeStatusItemCornerRadius: CGFloat = 12
     private static let menuBarIconTitleSpacing = " "
     private static let menuBarSeparator = " · "
 
@@ -107,7 +108,7 @@ final class OnTaskAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegat
             button.imageScaling = .scaleProportionallyDown
             button.attributedTitle = menuBarAttributedTitle(for: displayTaskTitle, button: button)
             button.contentTintColor = NSColor.labelColor.withAlphaComponent(0.85)
-            button.layer?.cornerRadius = max(button.bounds.height / 2, 5)
+            button.layer?.cornerRadius = Self.activeStatusItemCornerRadius
             button.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.28).cgColor
             statusItem.length = activeStatusItemLength(for: displayTaskTitle, button: button)
         } else {

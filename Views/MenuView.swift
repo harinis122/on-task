@@ -530,7 +530,7 @@ struct MenuView: View {
 
         let alert = NSAlert()
         alert.messageText = "Quit OnTask?"
-        alert.informativeText = "Quitting will discard your current task and timing state. This in-memory session cannot be restored."
+        alert.informativeText = "Quitting will discard your current task and timer/stopwatch. This cannot be restored."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Quit")
         alert.addButton(withTitle: "Cancel")
