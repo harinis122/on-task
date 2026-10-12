@@ -65,8 +65,8 @@ struct MenuView: View {
             Divider()
                 .opacity(0.45)
 
-            Button("Settings…") {
-                openSettings()
+            Button("Settings") {
+                openSettingsWindow()
             }
             .buttonStyle(OutlineButtonStyle())
 
@@ -507,6 +507,18 @@ struct MenuView: View {
     private func cancelRename() {
         renameText = ""
         isRenamingTask = false
+    }
+
+    // Opens Settings and brings its window forward from the menu-bar app.
+    private func openSettingsWindow() {
+        openSettings()
+
+        DispatchQueue.main.async {
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            NSApplication.shared.windows
+                .filter { $0.canBecomeKey && $0.styleMask.contains(.titled) }
+                .forEach { $0.makeKeyAndOrderFront(nil) }
+        }
     }
 
     // Confirms destructive quit when a task exists.
